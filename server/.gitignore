@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.log
+
+# Kredensial Google — jangan pernah di-commit
+service-account*.json
+*service-account*.json
+google-credentials*.json
+secrets/

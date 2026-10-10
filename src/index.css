@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: #173f35;
+    --color-primary-hover: #245747;
+    --color-accent: #f28c28;
+    --color-bg: #f5f6f2;
+    --color-surface: #ffffff;
+    --color-text: #17211d;
+    --color-muted: #66736c;
+    --color-border: #dce3dd;
+    --color-success: #238653;
+    --color-warning: #c27a13;
+    --color-danger: #c43d3d;
+    --color-info: #2876b8;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+    overflow-x: hidden;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-white;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply text-ink;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-card border border-line bg-surface;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-ink;
+  }
+
+  .field-input {
+    @apply w-full rounded-control border border-line bg-surface px-3 py-2.5 text-[15px] text-ink
+      placeholder:text-muted/70 transition-colors duration-ui
+      focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20
+      disabled:cursor-not-allowed disabled:bg-bg disabled:text-muted;
+  }
+
+  .field-input-error {
+    @apply border-danger focus:border-danger focus:ring-danger/20;
+  }
+
+  .field-helper {
+    @apply mt-1.5 text-[13px] text-muted;
+  }
+
+  .field-error {
+    @apply mt-1.5 flex items-start gap-1.5 text-[13px] font-medium text-danger;
+  }
+
+  .link {
+    @apply font-medium text-primary underline-offset-2 hover:underline;
+  }
+
+  .table-scroll {
+    @apply w-full overflow-x-auto;
+  }
+
+  .data-table {
+    @apply w-full min-w-[640px] border-collapse text-left text-sm;
+  }
+
+  .data-table thead th {
+    @apply whitespace-nowrap border-b border-line bg-bg/70 px-4 py-3 text-[13px] font-semibold text-muted;
+  }
+
+  .data-table tbody td {
+    @apply border-b border-line px-4 py-3 align-middle text-ink;
+  }
+
+  .data-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .data-table tbody tr:hover {
+    @apply bg-bg/50;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

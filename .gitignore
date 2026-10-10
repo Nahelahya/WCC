@@ -1,0 +1,14 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+.vite
+
+# Rahasia / konfigurasi lokal
+.env
+
+# Hasil build TypeScript
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
