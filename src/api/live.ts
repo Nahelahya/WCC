@@ -171,8 +171,8 @@ export const attendanceApi = {
   async bySession(sessionId: string): Promise<Attendance[]> {
     return request(`/sessions/${encodeURIComponent(sessionId)}/attendance`)
   },
-  async byUser(userId: string): Promise<AttendanceRow[]> {
-    return request(`/attendance${query({ userId })}`)
+  async byUser(userId: string, range?: { from?: string; to?: string }): Promise<AttendanceRow[]> {
+    return request(`/attendance${query({ userId, from: range?.from, to: range?.to })}`)
   },
   async recap(filter?: { from?: string; to?: string; userId?: string }): Promise<AttendanceRow[]> {
     return request(`/attendance${query({ userId: filter?.userId, from: filter?.from, to: filter?.to })}`)
@@ -339,6 +339,8 @@ type MemberDashboard = {
   hadir: number
   totalSessions: number
   percentage: number
+  from: string | null
+  to: string | null
   upcoming: Session[]
 }
 
@@ -354,8 +356,11 @@ type AdminDashboard = {
 }
 
 export const statsApi = {
-  async memberDashboard(_userId: string): Promise<MemberDashboard> {
-    return request('/dashboard/member')
+  async memberDashboard(
+    _userId: string,
+    range?: { from?: string; to?: string },
+  ): Promise<MemberDashboard> {
+    return request(`/dashboard/member${query({ from: range?.from, to: range?.to })}`)
   },
   async adminDashboard(): Promise<AdminDashboard> {
     return request('/dashboard/admin')

@@ -28,17 +28,27 @@ const upcomingQuery = (date: string, limit?: number) =>
 dashboardRouter.get(
   '/dashboard/member',
   wrap(async (req, res) => {
+    // from/to membatasi perhitungan ke satu bulan (rekap bulanan). Bila kosong,
+    // dihitung sejak awal (perilaku lama: seluruh waktu).
+    const q = z
+      .object({ from: z.string().optional(), to: z.string().optional() })
+      .parse(req.query ?? {})
     const today = todayISO()
     const userId = req.auth!.userId
+    const from = q.from ?? '0001-01-01'
+    const to = q.to ?? '9999-12-31'
 
     const { rows: hadirRows } = await query<{ hadir: number }>(
-      `select (count(*) filter (where status = 'hadir'))::int as hadir
-       from attendance where user_id = $1`,
-      [userId],
+      `select (count(*) filter (where a.status = 'hadir'))::int as hadir
+       from attendance a
+       join sessions s on s.id = a.session_id
+       where a.user_id = $1 and s.date >= $2 and s.date <= $3 and s.date <= $4`,
+      [userId, from, to, today],
     )
     const { rows: totalRows } = await query<{ total: number }>(
-      'select count(*)::int as total from sessions where cancelled = false and date <= $1',
-      [today],
+      `select count(*)::int as total from sessions
+       where cancelled = false and date >= $1 and date <= $2 and date <= $3`,
+      [from, to, today],
     )
     const { rows: upcoming } = await upcomingQuery(today)
 
@@ -48,6 +58,8 @@ dashboardRouter.get(
       hadir,
       totalSessions: total,
       percentage: total ? Math.round((hadir / total) * 100) : 0,
+      from: q.from ?? null,
+      to: q.to ?? null,
       upcoming: upcoming.map(mapSession),
     })
   }),

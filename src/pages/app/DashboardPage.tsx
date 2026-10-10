@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { coachApi, statsApi, attendanceApi, announcementApi } from '@/api/client'
 import { useAuth } from '@/context/AuthContext'
@@ -10,7 +11,8 @@ import { CardSkeleton, EmptyState, ErrorState, ListSkeleton } from '@/components
 import { StatusBadge, SESSION_TONE, SESSION_LABEL, SESSION_ICON, ATTENDANCE_TONE, ATTENDANCE_LABEL } from '@/components/ui/StatusBadge'
 import { Button, buttonClasses } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
-import { formatDateID, formatDateTimeID, formatRupiah, relativeDayID } from '@/lib/date'
+import { Input } from '@/components/ui/Field'
+import { currentMonth, formatDateID, formatDateTimeID, formatMonthID, formatRupiah, monthRange, relativeDayID } from '@/lib/date'
 import { sessionStatus } from '@/lib/session'
 
 export function DashboardPage() {
@@ -25,7 +27,10 @@ export function DashboardPage() {
 
 function MemberDashboard() {
   const { user } = useAuth()
-  const stats = useAsync(() => statsApi.memberDashboard(user!.id), [user!.id])
+  // Total kehadiran direset setiap bulan; pengguna dapat memilih bulan lain.
+  const [month, setMonth] = useState(currentMonth())
+  const range = month ? monthRange(month) : undefined
+  const stats = useAsync(() => statsApi.memberDashboard(user!.id, range), [user!.id, month])
   const coaches = useAsync(() => coachApi.list(), [])
   const announcements = useAsync(() => announcementApi.list(), [])
   const history = useAsync(() => attendanceApi.byUser(user!.id), [user!.id])
@@ -86,19 +91,30 @@ function MemberDashboard() {
         </div>
       )}
 
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[15px] font-semibold text-ink">Kehadiran bulanan</h2>
+          <p className="text-[12.5px] text-muted">Total direset setiap bulan.</p>
+        </div>
+        <div className="w-full sm:w-52">
+          <Input label="Bulan" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+        </div>
+      </div>
+
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Total kehadiran"
-          value={`${stats.data?.hadir ?? 0} sesi`}
+          label="Hadir"
+          value={stats.data?.hadir ?? 0}
           icon="check-circle"
           tone="success"
+          hint={month ? formatMonthID(month) : 'Semua periode'}
         />
         <StatCard
           label="Persentase kehadiran"
           value={`${stats.data?.percentage ?? 0}%`}
           icon="chart"
           tone="primary"
-          hint="Dihitung dari sesi yang telah berlangsung"
+          hint={`Dari ${stats.data?.totalSessions ?? 0} sesi`}
         />
         <StatCard
           label="Sesi berlangsung"

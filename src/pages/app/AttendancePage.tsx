@@ -12,7 +12,7 @@ import { Button, buttonClasses } from '@/components/ui/Button'
 import { Input, Select } from '@/components/ui/Field'
 import { Icon } from '@/components/ui/Icon'
 import { ATTENDANCE_LABEL, ATTENDANCE_TONE, StatusBadge, SESSION_TONE, SESSION_LABEL } from '@/components/ui/StatusBadge'
-import { downloadTextFile, formatDateID, todayISO } from '@/lib/date'
+import { downloadTextFile, currentMonth, formatDateID, formatMonthID, monthRange, todayISO } from '@/lib/date'
 import { sessionStatus } from '@/lib/session'
 import type { AttendanceRow } from '@/api/client'
 
@@ -30,8 +30,11 @@ export function AttendancePage() {
 function MyAttendance() {
   const { user } = useAuth()
   const [filter, setFilter] = useState('' as '' | 'menunggu' | 'hadir' | 'izin' | 'alpha')
+  // Rekap direset setiap bulan; pengguna dapat memilih bulan lain.
+  const [month, setMonth] = useState(currentMonth())
   const [page, setPage] = useState(1)
-  const rows = useAsync(() => attendanceApi.byUser(user!.id), [user!.id])
+  const range = month ? monthRange(month) : undefined
+  const rows = useAsync(() => attendanceApi.byUser(user!.id, range), [user!.id, month])
 
   const data = rows.data ?? []
   const filtered = filter ? data.filter((r) => r.status === filter) : data
@@ -79,14 +82,28 @@ function MyAttendance() {
         }
       />
 
+      <p className="mb-2 text-[12.5px] font-medium text-muted">
+        {month ? `Rekap ${formatMonthID(month)}` : 'Rekap semua periode'}
+      </p>
       <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Hadir" value={hadir} icon="check-circle" tone="success" hint="Total sesi tercatat" />
+        <StatCard label="Hadir" value={hadir} icon="check-circle" tone="success" hint={month ? formatMonthID(month) : 'Semua periode'} />
         <StatCard label="Izin" value={izin} icon="clock" tone="warning" />
         <StatCard label="Menunggu" value={menunggu} icon="refresh" tone="info" hint="Menunggu konfirmasi coach" />
         <StatCard label="Tidak hadir" value={alpha} icon="x" tone="danger" />
       </div>
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div className="w-full sm:w-56">
+          <Input
+            label="Bulan"
+            type="month"
+            value={month}
+            onChange={(e) => {
+              setMonth(e.target.value)
+              setPage(1)
+            }}
+          />
+        </div>
         <div className="w-full sm:w-56">
           <Select
             label="Filter status"
@@ -203,8 +220,8 @@ function CoachAttendanceList() {
 
 function AttendanceRecap() {
   const { toast } = useToast()
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
+  // Rekap direset setiap bulan; pengguna dapat memilih bulan lain.
+  const [month, setMonth] = useState(currentMonth())
   const [sessionId, setSessionId] = useState('')
   const [userId, setUserId] = useState('')
   const [status, setStatus] = useState('')
@@ -212,7 +229,7 @@ function AttendanceRecap() {
 
   const sessions = useAsync(() => sessionApi.list(), [])
   const members = useAsync(() => userApi.list(), [])
-  const recap = useAsync(() => attendanceApi.recap({ from: from || undefined, to: to || undefined }), [from, to])
+  const recap = useAsync(() => attendanceApi.recap(month ? monthRange(month) : undefined), [month])
 
   const rows = useMemo(() => {
     let data = recap.data ?? []
@@ -284,7 +301,7 @@ function AttendanceRecap() {
     <>
       <PageHeader
         title="Rekap Absensi"
-        description="Tinjau kehadiran anggota per sesi dan per anggota."
+        description="Tinjau kehadiran anggota per bulan, per sesi, dan per anggota."
         action={
           <Button variant="secondary" icon="download" onClick={exportCsv}>
             Ekspor CSV
@@ -293,7 +310,7 @@ function AttendanceRecap() {
       />
 
       <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total catatan" value={rows.length} icon="list" tone="primary" />
+        <StatCard label="Total catatan" value={rows.length} icon="list" tone="primary" hint={month ? formatMonthID(month) : 'Semua periode'} />
         <StatCard label="Hadir" value={hadir} icon="check-circle" tone="success" />
         <StatCard label="Izin" value={rows.filter((r) => r.status === 'izin').length} icon="clock" tone="warning" />
         <StatCard
@@ -305,9 +322,8 @@ function AttendanceRecap() {
       </div>
 
       <div className="card mb-5 p-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Input label="Dari tanggal" type="date" value={from} onChange={(e) => resetPage(setFrom)(e.target.value)} />
-          <Input label="Sampai tanggal" type="date" value={to} onChange={(e) => resetPage(setTo)(e.target.value)} />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Input label="Bulan" type="month" value={month} onChange={(e) => resetPage(setMonth)(e.target.value)} />
           <Select label="Sesi" value={sessionId} onChange={(e) => resetPage(setSessionId)(e.target.value)}>
             <option value="">Semua sesi</option>
             {(sessions.data ?? []).map((s) => (
@@ -335,13 +351,12 @@ function AttendanceRecap() {
               <option value="alpha">Tidak hadir</option>
             </Select>
           </div>
-          {(from || to || sessionId || userId || status) && (
+          {(sessionId || userId || status || month !== currentMonth()) && (
             <Button
               variant="ghost"
               icon="x"
               onClick={() => {
-                setFrom('')
-                setTo('')
+                setMonth(currentMonth())
                 setSessionId('')
                 setUserId('')
                 setStatus('')

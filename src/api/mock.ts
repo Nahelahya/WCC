@@ -193,14 +193,12 @@ export const attendanceApi = {
   async bySession(sessionId: string): Promise<Attendance[]> {
     return delay(read().attendance.filter((a) => a.sessionId === sessionId))
   },
-  async byUser(userId: string): Promise<AttendanceRow[]> {
+  async byUser(userId: string, range?: { from?: string; to?: string }): Promise<AttendanceRow[]> {
     const db = read()
-    return delay(
-      db.attendance
-        .filter((a) => a.userId === userId)
-        .map((a) => decorate(db, a))
-        .sort((a, b) => b.sessionDate.localeCompare(a.sessionDate)),
-    )
+    let rows = db.attendance.filter((a) => a.userId === userId).map((a) => decorate(db, a))
+    if (range?.from) rows = rows.filter((r) => r.sessionDate >= range.from!)
+    if (range?.to) rows = rows.filter((r) => r.sessionDate <= range.to!)
+    return delay(rows.sort((a, b) => b.sessionDate.localeCompare(a.sessionDate)))
   },
   async recap(filter?: { from?: string; to?: string; userId?: string }): Promise<AttendanceRow[]> {
     const db = read()
@@ -513,12 +511,19 @@ export const syncApi = {
 /* ------------------------------------------------------------------ */
 
 export const statsApi = {
-  async memberDashboard(userId: string) {
+  async memberDashboard(userId: string, range?: { from?: string; to?: string }) {
     const db = read()
     const today = todayISO()
-    const myAttendance = db.attendance.filter((a) => a.userId === userId)
-    const hadir = myAttendance.filter((a) => a.status === 'hadir').length
-    const totalSessions = db.sessions.filter((s) => !s.cancelled && s.date <= today).length
+    const from = range?.from
+    const to = range?.to
+    const inRange = (date: string) => (!from || date >= from) && (!to || date <= to)
+    const sessionDateOf = (a: Attendance) => db.sessions.find((s) => s.id === a.sessionId)?.date ?? ''
+    const hadir = db.attendance.filter(
+      (a) => a.userId === userId && a.status === 'hadir' && inRange(sessionDateOf(a)),
+    ).length
+    const totalSessions = db.sessions.filter(
+      (s) => !s.cancelled && s.date <= today && inRange(s.date),
+    ).length
     const upcoming = db.sessions
       .filter((s) => !s.cancelled && s.date >= today)
       .sort((a, b) => (a.date === b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date)))
@@ -526,6 +531,8 @@ export const statsApi = {
       hadir,
       totalSessions,
       percentage: totalSessions ? Math.round((hadir / totalSessions) * 100) : 0,
+      from: from ?? null,
+      to: to ?? null,
       upcoming,
     })
   },

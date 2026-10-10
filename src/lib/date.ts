@@ -124,6 +124,23 @@ export function monthLabelID(iso: string): string {
   return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 
+/** Bulan berjalan dalam format 'YYYY-MM' (cocok untuk <input type="month">). */
+export function currentMonth(now: Date = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** Rentang tanggal (from, to) untuk bulan 'YYYY-MM'. */
+export function monthRange(month: string): { from: string; to: string } {
+  const [y, m] = month.split('-').map(Number)
+  return { from: toISO(new Date(y, m - 1, 1)), to: toISO(new Date(y, m, 0)) }
+}
+
+/** 'YYYY-MM' -> "Oktober 2026". */
+export function formatMonthID(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return `${MONTHS[m - 1] ?? ''} ${y}`.trim()
+}
+
 export function downloadTextFile(filename: string, content: string, mime = 'text/plain') {
   const blob = new Blob(['\ufeff' + content], { type: `${mime};charset=utf-8` })
   const url = URL.createObjectURL(blob)
