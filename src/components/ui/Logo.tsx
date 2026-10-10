@@ -7,13 +7,21 @@ interface LogoProps {
   /** Nama klub ditampilkan di samping logo. */
   withWordmark?: boolean
   variant?: 'dark' | 'light'
+  /** Kelas tambahan untuk teks nama klub (mis. disembunyikan di layar kecil). */
+  wordmarkClassName?: string
 }
 
 /**
  * Logo resmi klub (public/logo-wcc.png).
  * Gambar memiliki latar transparan/biru; gunakan `variant="light"` di latar gelap.
  */
-export function Logo({ className, size = 40, withWordmark = true, variant = 'dark' }: LogoProps) {
+export function Logo({
+  className,
+  size = 40,
+  withWordmark = true,
+  variant = 'dark',
+  wordmarkClassName,
+}: LogoProps) {
   return (
     <span className={cn('flex items-center gap-2.5', className)}>
       <img
@@ -25,7 +33,7 @@ export function Logo({ className, size = 40, withWordmark = true, variant = 'dar
         loading="eager"
       />
       {withWordmark && (
-        <span className="min-w-0 leading-tight">
+        <span className={cn('min-w-0 leading-tight', wordmarkClassName)}>
           <span
             className={cn(
               'block truncate text-[13px] font-bold tracking-[0.14em]',

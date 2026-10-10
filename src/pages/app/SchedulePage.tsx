@@ -169,7 +169,7 @@ export function SchedulePage() {
             ))}
           </div>
 
-          <div className="grid flex-1 grid-cols-2 gap-3 sm:max-w-md">
+          <div className="grid w-full grid-cols-2 gap-3 sm:w-auto sm:min-w-[260px] sm:flex-1 sm:max-w-md">
             <Input
               label="Dari tanggal"
               type="date"

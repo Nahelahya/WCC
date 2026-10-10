@@ -26,7 +26,7 @@ export function PublicLayout() {
       <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-4 px-4 sm:px-6">
           <Link to="/" className="flex flex-none items-center" aria-label="Beranda WISANGGENI CLIMBING CLUB">
-            <Logo size={38} />
+            <Logo size={38} wordmarkClassName="hidden sm:block" />
           </Link>
 
           <nav className="ml-6 hidden items-center gap-1 lg:flex" aria-label="Navigasi publik">

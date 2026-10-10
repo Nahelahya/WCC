@@ -44,6 +44,14 @@
     @apply rounded-card border border-line bg-surface;
   }
 
+  /* Grid Tailwind tanpa kolom eksplisit (mis. `grid gap-4 sm:grid-cols-2`) memakai satu kolom
+     implisit berukuran `auto` (min-content). Isi yang panjang (nilai statistik, dsb.) lalu
+     memaksa lebar melebihi layar dan memicu scroll horizontal di HP. Paksa kolom implisit
+     agar boleh menyusut; `grid-cols-*` eksplisit tetap berlaku karena menimpa di layer utilitas. */
+  .grid {
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
   .field-label {
     @apply mb-1.5 block text-sm font-medium text-ink;
   }

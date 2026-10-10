@@ -67,7 +67,7 @@ export function DataTable<T>({
               </li>
             ))}
           </ul>
-          <div className="hidden sm:block">
+          <div className="hidden overflow-x-auto sm:block">
             <TableBody columns={columns} rows={rows} rowKey={rowKey} onRowClick={onRowClick} caption={caption} />
           </div>
         </>
