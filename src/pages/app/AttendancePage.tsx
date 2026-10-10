@@ -29,7 +29,7 @@ export function AttendancePage() {
 
 function MyAttendance() {
   const { user } = useAuth()
-  const [filter, setFilter] = useState('' as '' | 'hadir' | 'izin' | 'alpha')
+  const [filter, setFilter] = useState('' as '' | 'menunggu' | 'hadir' | 'izin' | 'alpha')
   const [page, setPage] = useState(1)
   const rows = useAsync(() => attendanceApi.byUser(user!.id), [user!.id])
 
@@ -41,6 +41,7 @@ function MyAttendance() {
   const hadir = data.filter((r) => r.status === 'hadir').length
   const izin = data.filter((r) => r.status === 'izin').length
   const alpha = data.filter((r) => r.status === 'alpha').length
+  const menunggu = data.filter((r) => r.status === 'menunggu').length
 
   const columns: Column<AttendanceRow>[] = [
     {
@@ -53,7 +54,9 @@ function MyAttendance() {
       key: 'time',
       header: 'Waktu check-in',
       render: (r) => (
-        <span className="text-muted">{r.status === 'hadir' && r.checkInTime ? r.checkInTime : '—'}</span>
+        <span className="text-muted">
+          {(r.status === 'hadir' || r.status === 'menunggu') && r.checkInTime ? r.checkInTime : '—'}
+        </span>
       ),
     },
     {
@@ -76,9 +79,10 @@ function MyAttendance() {
         }
       />
 
-      <div className="mb-5 grid gap-4 sm:grid-cols-3">
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Hadir" value={hadir} icon="check-circle" tone="success" hint="Total sesi tercatat" />
         <StatCard label="Izin" value={izin} icon="clock" tone="warning" />
+        <StatCard label="Menunggu" value={menunggu} icon="refresh" tone="info" hint="Menunggu konfirmasi coach" />
         <StatCard label="Tidak hadir" value={alpha} icon="x" tone="danger" />
       </div>
 
@@ -95,6 +99,7 @@ function MyAttendance() {
             <option value="">Semua status</option>
             <option value="hadir">Hadir</option>
             <option value="izin">Izin</option>
+            <option value="menunggu">Menunggu konfirmasi</option>
             <option value="alpha">Tidak hadir</option>
           </Select>
         </div>
@@ -263,7 +268,9 @@ function AttendanceRecap() {
       key: 'time',
       header: 'Waktu check-in',
       render: (r) => (
-        <span className="text-muted">{r.status === 'hadir' && r.checkInTime ? r.checkInTime : '—'}</span>
+        <span className="text-muted">
+          {(r.status === 'hadir' || r.status === 'menunggu') && r.checkInTime ? r.checkInTime : '—'}
+        </span>
       ),
     },
     {
@@ -324,6 +331,7 @@ function AttendanceRecap() {
               <option value="">Semua status</option>
               <option value="hadir">Hadir</option>
               <option value="izin">Izin</option>
+              <option value="menunggu">Menunggu konfirmasi</option>
               <option value="alpha">Tidak hadir</option>
             </Select>
           </div>

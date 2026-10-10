@@ -11,6 +11,7 @@ import type {
 } from '@/types'
 import { createSeedDatabase, DB_KEY, DB_VERSION, refreshDemoDates } from '@/data/seed'
 import { todayISO } from '@/lib/date'
+import { canCheckIn } from '@/lib/session'
 import type { AttendanceRow, AuthSession, SessionInput, TreasurySummary } from './types'
 
 /**
@@ -211,18 +212,25 @@ export const attendanceApi = {
     return delay(rows)
   },
   async checkIn(sessionId: string, userId: string): Promise<Attendance> {
-    const existing = read().attendance.find((a) => a.sessionId === sessionId && a.userId === userId)
+    const db = read()
+    const session = db.sessions.find((s) => s.id === sessionId)
+    if (!session) return fail('Sesi tidak ditemukan.', 404)
+    // Selaras dengan backend: check-in hanya dalam jendela waktu sesi.
+    const gate = canCheckIn(session)
+    if (!gate.ok) return fail(gate.reason ?? 'Check-in belum tersedia.')
+    const existing = db.attendance.find((a) => a.sessionId === sessionId && a.userId === userId)
     if (existing) return fail('Anda sudah tercatat pada sesi ini.')
     return delay(
-      mutate((db) => {
+      mutate((d) => {
+        // Check-in anggota berstatus 'menunggu' hingga dikonfirmasi coach/pengurus.
         const a: Attendance = {
           id: uid('a'),
           sessionId,
           userId,
           checkInAt: new Date().toISOString(),
-          status: 'hadir',
+          status: 'menunggu',
         }
-        db.attendance.push(a)
+        d.attendance.push(a)
         return a
       }),
     )
@@ -253,7 +261,7 @@ function decorate(db: Database, a: Attendance): AttendanceRow {
     sessionTitle: session?.title ?? 'Sesi latihan',
     sessionDate: session?.date ?? '',
     checkInTime:
-      a.status === 'hadir'
+      a.status === 'hadir' || a.status === 'menunggu'
         ? `${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`
         : null,
   }

@@ -29,7 +29,7 @@ export interface Attendance {
   sessionId: string
   userId: string
   checkInAt: string // ISO datetime
-  status: 'hadir' | 'izin' | 'alpha'
+  status: 'menunggu' | 'hadir' | 'izin' | 'alpha'
 }
 
 export type AnnouncementPriority = 'tinggi' | 'normal' | 'rendah'

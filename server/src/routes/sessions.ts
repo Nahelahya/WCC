@@ -208,7 +208,7 @@ sessionRouter.post(
 
     const { rows } = await query<AttendanceRowDB>(
       `insert into attendance (id, session_id, user_id, check_in_at, status)
-       values ($1, $2, $3, now(), 'hadir')
+       values ($1, $2, $3, now(), 'menunggu')
        returning *`,
       [newId('a'), session.id, userId],
     )
@@ -219,11 +219,27 @@ sessionRouter.post(
 sessionRouter.patch(
   '/:id/attendance/:userId',
   requireAuth,
-  requireRole('pengurus'),
+  requireRole('pengurus', 'coach'),
   wrap(async (req, res) => {
     const { status } = z
       .object({ status: z.enum(['hadir', 'izin', 'alpha']) })
       .parse(req.body ?? {})
+
+    // Coach hanya boleh mencatat kehadiran pada sesi yang menjadi tanggung jawabnya.
+    if (req.auth!.role === 'coach') {
+      const { rows: sessions } = await query<SessionRow>('select * from sessions where id = $1', [
+        req.params.id,
+      ])
+      const session = sessions[0]
+      if (!session) throw ApiError.notFound('Sesi tidak ditemukan.')
+      const { rows: me } = await query<{ coach_id: string | null }>(
+        'select coach_id from users where id = $1',
+        [req.auth!.userId],
+      )
+      if (!me[0]?.coach_id || me[0].coach_id !== session.coach_id) {
+        throw ApiError.forbidden('Anda hanya dapat mencatat kehadiran pada sesi yang Anda ampu.')
+      }
+    }
 
     const { rows } = await query<AttendanceRowDB>(
       `insert into attendance (id, session_id, user_id, check_in_at, status)
@@ -252,6 +268,7 @@ sessionRouter.get(
     res.json({
       hadir: byStatus('hadir'),
       izin: byStatus('izin'),
+      menunggu: byStatus('menunggu'),
       totalMembers: members[0]?.total ?? 0,
     })
   }),

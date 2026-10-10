@@ -58,12 +58,14 @@ export const SESSION_ICON: Record<string, IconName> = {
 }
 
 export const ATTENDANCE_TONE: Record<string, StatusTone> = {
+  menunggu: 'info',
   hadir: 'success',
   izin: 'warning',
   alpha: 'danger',
 }
 
 export const ATTENDANCE_LABEL: Record<string, string> = {
+  menunggu: 'Menunggu konfirmasi',
   hadir: 'Hadir',
   izin: 'Izin',
   alpha: 'Tidak hadir',

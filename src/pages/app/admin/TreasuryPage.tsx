@@ -47,6 +47,8 @@ function periodDefaults() {
 export function TreasuryPage() {
   const { user } = useAuth()
   const { toast } = useToast()
+  // Hanya pengurus yang boleh mencatat/mengubah kas. Anggota hanya melihat.
+  const isManager = user!.role === 'pengurus'
   const [period, setPeriod] = useState(periodDefaults())
   const [typeFilter, setTypeFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -54,7 +56,7 @@ export function TreasuryPage() {
 
   const list = useAsync(() => treasuryApi.list(), [])
   const summary = useAsync(() => treasuryApi.summary(period), [period.from, period.to])
-  const sync = useAsync(() => syncApi.get(), [])
+  const sync = useAsync(() => (isManager ? syncApi.get() : Promise.resolve(null)), [isManager])
 
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<FormState>(EMPTY)
@@ -179,41 +181,64 @@ export function TreasuryPage() {
     },
     { key: 'note', header: 'Keterangan', render: (t) => <span className="text-muted">{t.note || '—'}</span> },
     { key: 'by', header: 'Dicatat oleh', hideOnMobile: true, render: (t) => <span className="text-muted">{t.recordedBy}</span> },
-    {
-      key: 'action',
-      header: 'Aksi',
-      align: 'right',
-      render: (t) => (
-        <div className="flex justify-end gap-1.5">
-          <Button size="sm" variant="secondary" icon="edit" onClick={() => openEdit(t)}>
-            Edit
-          </Button>
-          <Button size="sm" variant="danger" icon="trash" onClick={() => setDeleteTarget(t)}>
-            Hapus
-          </Button>
-        </div>
-      ),
-    },
+    ...(isManager
+      ? [
+          {
+            key: 'action',
+            header: 'Aksi',
+            align: 'right' as const,
+            render: (t: Transaction) => (
+              <div className="flex justify-end gap-1.5">
+                <Button size="sm" variant="secondary" icon="edit" onClick={() => openEdit(t)}>
+                  Edit
+                </Button>
+                <Button size="sm" variant="danger" icon="trash" onClick={() => setDeleteTarget(t)}>
+                  Hapus
+                </Button>
+              </div>
+            ),
+          },
+        ]
+      : []),
   ]
 
   return (
     <>
       <PageHeader
-        title="Kas & Treasury"
-        description="Catat transaksi pemasukan dan pengeluaran kas klub."
-        action={<Button icon="plus" onClick={openCreate}>Catat Transaksi</Button>}
+        title={isManager ? 'Kas & Treasury' : 'Kas Klub'}
+        description={
+          isManager
+            ? 'Catat transaksi pemasukan dan pengeluaran kas klub.'
+            : 'Ringkasan saldo dan transaksi kas klub (hanya lihat).'
+        }
+        action={
+          isManager ? (
+            <Button icon="plus" onClick={openCreate}>
+              Catat Transaksi
+            </Button>
+          ) : undefined
+        }
       />
 
-      <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {!isManager && (
+        <Alert tone="info" className="mb-5">
+          Anda dapat melihat ringkasan saldo dan daftar transaksi kas klub. Penambahan atau perubahan
+          data dilakukan oleh pengurus.
+        </Alert>
+      )}
+
+      <div className={`mb-5 grid gap-4 sm:grid-cols-2 ${isManager ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
         <StatCard label="Saldo saat ini" value={formatRupiah(s.balance)} icon="wallet" tone="primary" hint="Pemasukan − pengeluaran (seluruh waktu)" />
         <StatCard label="Pemasukan periode" value={formatRupiah(s.income)} icon="plus" tone="success" hint={`${formatDateID(period.from)} – ${formatDateID(period.to)}`} />
         <StatCard label="Pengeluaran periode" value={formatRupiah(s.expense)} icon="arrow-right" tone="danger" />
-        <StatCard
-          label="Sinkronisasi terakhir"
-          value={sync.data?.lastSyncAt ? formatDateTimeID(sync.data.lastSyncAt) : 'Belum pernah'}
-          icon="refresh"
-          tone={sync.data?.status === 'success' ? 'success' : sync.data?.status === 'failed' ? 'danger' : 'neutral'}
-        />
+        {isManager && (
+          <StatCard
+            label="Sinkronisasi terakhir"
+            value={sync.data?.lastSyncAt ? formatDateTimeID(sync.data.lastSyncAt) : 'Belum pernah'}
+            icon="refresh"
+            tone={sync.data?.status === 'success' ? 'success' : sync.data?.status === 'failed' ? 'danger' : 'neutral'}
+          />
+        )}
       </div>
 
       <div className="card mb-5 p-4">
@@ -250,7 +275,14 @@ export function TreasuryPage() {
         </div>
       </div>
 
-      <SectionHeader title={`${rows.length} transaksi`} description="Urut dari tanggal terbaru. Setiap perubahan transaksi dicatat sistem." />
+      <SectionHeader
+        title={`${rows.length} transaksi`}
+        description={
+          isManager
+            ? 'Urut dari tanggal terbaru. Setiap perubahan transaksi dicatat sistem.'
+            : 'Urut dari tanggal terbaru.'
+        }
+      />
       <DataTable
         columns={columns}
         rows={current}
@@ -279,12 +311,16 @@ export function TreasuryPage() {
               <StatusBadge tone={t.type === 'pemasukan' ? 'success' : 'danger'}>
                 {t.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
               </StatusBadge>
-              <Button size="sm" variant="secondary" icon="edit" onClick={() => openEdit(t)}>
-                Edit
-              </Button>
-              <Button size="sm" variant="danger" icon="trash" onClick={() => setDeleteTarget(t)}>
-                Hapus
-              </Button>
+              {isManager && (
+                <>
+                  <Button size="sm" variant="secondary" icon="edit" onClick={() => openEdit(t)}>
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="danger" icon="trash" onClick={() => setDeleteTarget(t)}>
+                    Hapus
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         )}

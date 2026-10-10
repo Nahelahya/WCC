@@ -131,7 +131,7 @@ export function mapAttendanceDecorated(row: AttendanceRowDB) {
     userName: row.user_name ?? 'Anggota',
     sessionTitle: row.session_title ?? 'Sesi latihan',
     sessionDate: row.session_date ?? '',
-    checkInTime: row.status === 'hadir' ? clock(row.check_in_at) : null,
+    checkInTime: row.status === 'hadir' || row.status === 'menunggu' ? clock(row.check_in_at) : null,
   }
 }
 

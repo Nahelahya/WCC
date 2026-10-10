@@ -8,8 +8,10 @@ import { newId } from '../lib/ids'
 import { requireAuth, requireRole } from '../middleware/auth'
 
 export const transactionRouter = Router()
-// Seluruh endpoint kas hanya untuk pengurus.
-transactionRouter.use(requireAuth, requireRole('pengurus'))
+// Semua pengguna yang login boleh MELIHAT ringkasan & daftar kas (transparansi,
+// sesuai PRD 7.8: "Anggota dapat melihat ringkasan saldo kas dan laporan ringkas
+// (read-only)"). Operasi tulis tetap hanya untuk pengurus, dijaga per-rute.
+transactionRouter.use(requireAuth)
 
 transactionRouter.get(
   '/',
@@ -74,6 +76,7 @@ async function currentUserName(userId: string): Promise<string> {
 
 transactionRouter.post(
   '/',
+  requireRole('pengurus'),
   wrap(async (req, res) => {
     const input = transactionSchema.parse(req.body ?? {})
     const recordedBy = input.recordedBy ?? (await currentUserName(req.auth!.userId))
@@ -98,6 +101,7 @@ transactionRouter.post(
 
 transactionRouter.patch(
   '/:id',
+  requireRole('pengurus'),
   wrap(async (req, res) => {
     const patch = transactionSchema.partial().parse(req.body ?? {})
     const { rows } = await query<TransactionRow>(
@@ -127,6 +131,7 @@ transactionRouter.patch(
 
 transactionRouter.delete(
   '/:id',
+  requireRole('pengurus'),
   wrap(async (req, res) => {
     const { rowCount } = await query('delete from transactions where id = $1', [req.params.id])
     if (!rowCount) throw ApiError.notFound('Transaksi tidak ditemukan.')

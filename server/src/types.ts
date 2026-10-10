@@ -1,5 +1,6 @@
 export type Role = 'anggota' | 'coach' | 'pengurus'
-export type AttendanceStatus = 'hadir' | 'izin' | 'alpha'
+// 'menunggu' = anggota sudah check-in tetapi belum dikonfirmasi coach/pengurus.
+export type AttendanceStatus = 'menunggu' | 'hadir' | 'izin' | 'alpha'
 export type RegistrationStatus = 'baru' | 'diverifikasi' | 'ditolak'
 export type TransactionType = 'pemasukan' | 'pengeluaran'
 export type AnnouncementPriority = 'tinggi' | 'normal' | 'rendah'

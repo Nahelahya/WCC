@@ -65,6 +65,7 @@ export function SessionDetailPage() {
   const hadir = participants.filter((p) => p.status === 'hadir').length
   const izin = participants.filter((p) => p.status === 'izin').length
   const belum = participants.filter((p) => p.status === 'belum').length
+  const menunggu = participants.filter((p) => p.status === 'menunggu').length
 
   if (session.loading) return <PageLoading />
   if (session.error)
@@ -93,6 +94,8 @@ export function SessionDetailPage() {
   const checkIn = canCheckIn(s)
   const isManager = user!.role === 'pengurus'
   const isCoachOfSession = user!.role === 'coach' && user!.coachId === s.coachId
+  // Pengurus dapat mengoreksi semua sesi; coach hanya sesi yang ia ampu.
+  const canManage = isManager || isCoachOfSession
   const isPast = status === 'selesai'
 
   async function doCheckIn() {
@@ -102,7 +105,7 @@ export function SessionDetailPage() {
       const created = await attendanceApi.checkIn(s!.id, user!.id)
       const d = new Date(created.checkInAt)
       const hhmm = `${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`
-      toast(`Absensi berhasil dicatat pada pukul ${hhmm}.`, 'success')
+      toast(`Check-in terkirim pukul ${hhmm}. Menunggu konfirmasi coach.`, 'success')
       attendance.reload()
     } catch (err) {
       toast(errorMessage(err), 'error')
@@ -140,7 +143,9 @@ export function SessionDetailPage() {
       header: 'Waktu check-in',
       render: (p) => (
         <span className="text-[13px] text-muted">
-          {p.status === 'hadir' && p.checkInAt ? formatDateTimeID(p.checkInAt).split(', ')[1] : '—'}
+          {(p.status === 'hadir' || p.status === 'menunggu') && p.checkInAt
+            ? formatDateTimeID(p.checkInAt).split(', ')[1]
+            : '—'}
         </span>
       ),
     },
@@ -158,11 +163,11 @@ export function SessionDetailPage() {
           </StatusBadge>
         ),
     },
-    ...(isManager
+    ...(canManage
       ? [
           {
             key: 'action',
-            header: 'Koreksi',
+            header: 'Kehadiran',
             align: 'right' as const,
             render: (p: Participant) => (
               <div className="flex justify-end gap-1.5">
@@ -244,13 +249,21 @@ export function SessionDetailPage() {
 
               {myAttendance ? (
                 <Alert
-                  tone={myAttendance.status === 'hadir' ? 'success' : 'warning'}
+                  tone={
+                    myAttendance.status === 'hadir'
+                      ? 'success'
+                      : myAttendance.status === 'alpha'
+                        ? 'error'
+                        : 'warning'
+                  }
                   className="mt-3"
                   title={`Status: ${ATTENDANCE_LABEL[myAttendance.status]}`}
                 >
                   {myAttendance.status === 'hadir'
-                    ? `Absensi berhasil dicatat pada pukul ${formatDateTimeID(myAttendance.checkInAt).split(', ')[1]}.`
-                    : 'Status kehadiran Anda pada sesi ini telah dicatat pengurus.'}
+                    ? `Absensi terkonfirmasi pada pukul ${formatDateTimeID(myAttendance.checkInAt).split(', ')[1]}.`
+                    : myAttendance.status === 'menunggu'
+                      ? `Check-in tercatat pukul ${formatDateTimeID(myAttendance.checkInAt).split(', ')[1]}. Menunggu konfirmasi coach/pengurus.`
+                      : 'Status kehadiran Anda pada sesi ini telah dicatat pengurus.'}
                 </Alert>
               ) : status === 'dibatalkan' ? (
                 <Alert tone="error" className="mt-3">
@@ -272,7 +285,7 @@ export function SessionDetailPage() {
                     Check-in Sekarang
                   </Button>
                   <p className="mt-2 text-[12.5px] text-muted">
-                    Pastikan Anda benar-benar hadir di lokasi latihan.
+                    Pastikan Anda benar-benar hadir di lokasi latihan. Kehadiran akan dikonfirmasi oleh coach.
                   </p>
                 </>
               ) : (
@@ -309,6 +322,12 @@ export function SessionDetailPage() {
                 </div>
               </div>
 
+              {menunggu > 0 && (
+                <Alert tone="info" className="mb-3" title={`${menunggu} check-in menunggu konfirmasi`}>
+                  Konfirmasi kehadiran anggota lewat tombol Hadir / Izin / Tidak hadir pada kolom aksi.
+                </Alert>
+              )}
+
               {members.loading || attendance.loading ? (
                 <div className="card">
                   <ListSkeleton rows={5} />
@@ -336,7 +355,7 @@ export function SessionDetailPage() {
                           <StatusBadge tone={ATTENDANCE_TONE[p.status]}>{ATTENDANCE_LABEL[p.status]}</StatusBadge>
                         )}
                       </div>
-                      {isManager && (
+                      {canManage && (
                         <div className="mt-3 flex flex-wrap gap-1.5">
                           {(['hadir', 'izin', 'alpha'] as const).map((v) => (
                             <Button
@@ -356,9 +375,9 @@ export function SessionDetailPage() {
                 />
               )}
 
-              {!isManager && (
+              {isCoachOfSession && (
                 <p className="mt-3 text-[12.5px] text-muted">
-                  Sebagai coach, Anda dapat melihat daftar hadir. Perubahan status kehadiran dilakukan pengurus.
+                  Sebagai coach sesi ini, Anda dapat mengonfirmasi atau mengoreksi kehadiran peserta.
                 </p>
               )}
             </div>
@@ -383,6 +402,13 @@ export function SessionDetailPage() {
                   Izin
                 </span>
                 <span className="text-lg font-bold text-ink">{izin}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-sm text-muted">
+                  <Icon name="refresh" size={17} className="text-info" />
+                  Menunggu konfirmasi
+                </span>
+                <span className="text-lg font-bold text-ink">{menunggu}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 text-sm text-muted">
