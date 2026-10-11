@@ -25,6 +25,12 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
   }
 }
 
+/** Token acak sekali pakai (mis. tautan reset password); hanya hash yang disimpan di DB. */
+export function createOpaqueToken(): { token: string; hash: string } {
+  const token = randomBytes(32).toString('hex')
+  return { token, hash: hashToken(token) }
+}
+
 /** Refresh token = string acak; yang disimpan di database hanya hash-nya. */
 export function createRefreshToken(): { token: string; hash: string } {
   const token = randomBytes(48).toString('base64url')

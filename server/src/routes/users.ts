@@ -29,6 +29,7 @@ const profileSchema = z.object({
   name: z.string().trim().min(1, 'Nama wajib diisi.').optional(),
   phone: z.string().trim().max(40, 'Nomor kontak terlalu panjang.').optional(),
   email: z.string().trim().email('Format email tidak valid.').optional(),
+  photoUrl: z.string().optional(),
 })
 
 userRouter.patch(
@@ -41,13 +42,14 @@ userRouter.patch(
     const patch = profileSchema.parse(req.body ?? {})
     const { rows } = await query<UserRow>(
       `update users set
-         name  = coalesce($2, name),
-         phone = coalesce($3, phone),
-         email = coalesce($4, email),
+         name      = coalesce($2, name),
+         phone     = coalesce($3, phone),
+         email     = coalesce($4, email),
+         photo_url = coalesce($5, photo_url),
          updated_at = now()
        where id = $1
        returning *`,
-      [id, patch.name ?? null, patch.phone ?? null, patch.email ?? null],
+      [id, patch.name ?? null, patch.phone ?? null, patch.email ?? null, patch.photoUrl ?? null],
     )
     if (!rows[0]) throw ApiError.notFound('Pengguna tidak ditemukan.')
     res.json(mapUser(rows[0]))

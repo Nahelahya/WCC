@@ -41,6 +41,18 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     }
   }
 
+  // Kesalahan unggah berkas dari multer (mis. melebihi batas ukuran).
+  if (typeof err === 'object' && err !== null && (err as { name?: string }).name === 'MulterError') {
+    const code = (err as { code?: string }).code
+    const tooLarge = code === 'LIMIT_FILE_SIZE'
+    res.status(tooLarge ? 413 : 400).json({
+      message: tooLarge
+        ? `Ukuran berkas melebihi batas (maksimal ${env.uploadMaxMb} MB).`
+        : 'Unggahan berkas tidak valid.',
+    })
+    return
+  }
+
   console.error('[error]', err)
   res.status(500).json({
     message: env.isProd ? 'Terjadi kesalahan pada server.' : String((err as Error)?.message ?? err),

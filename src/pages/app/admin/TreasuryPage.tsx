@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { treasuryApi, syncApi, type TreasurySummary } from '@/api/client'
+import { treasuryApi, syncApi, uploadApi, type TreasurySummary } from '@/api/client'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useAsync, errorMessage } from '@/lib/hooks'
@@ -27,6 +27,7 @@ interface FormState {
   amount: string
   note: string
   receiptName?: string
+  receiptUrl?: string
 }
 
 const EMPTY: FormState = {
@@ -66,6 +67,7 @@ export function TreasuryPage() {
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [uploadingReceipt, setUploadingReceipt] = useState(false)
 
   const categories = form.type === 'pemasukan' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
 
@@ -97,12 +99,29 @@ export function TreasuryPage() {
       type: t.type,
       category: t.category,
       date: t.date,
-      amount: String(t.amount),
+          amount: String(t.amount),
       note: t.note,
       receiptName: t.receiptName,
+      receiptUrl: t.receiptUrl,
     })
     setErrors({})
     setFormOpen(true)
+  }
+
+  async function onReceiptChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploadingReceipt(true)
+    try {
+      const res = await uploadApi.upload(file)
+      setForm((f) => ({ ...f, receiptName: res.name, receiptUrl: res.url }))
+      toast('Bukti transaksi berhasil diunggah.', 'success')
+    } catch (err) {
+      toast(errorMessage(err), 'error')
+    } finally {
+      setUploadingReceipt(false)
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -128,6 +147,7 @@ export function TreasuryPage() {
         note: form.note,
         recordedBy: form.id ? undefined : user!.name,
         receiptName: form.receiptName,
+        receiptUrl: form.receiptUrl,
       })
       toast(form.id ? 'Perubahan transaksi berhasil disimpan.' : 'Transaksi kas berhasil dicatat.', 'success')
       setFormOpen(false)
@@ -181,7 +201,28 @@ export function TreasuryPage() {
         </span>
       ),
     },
-    { key: 'note', header: 'Keterangan', render: (t) => <span className="text-muted">{t.note || '—'}</span> },
+    {
+      key: 'note',
+      header: 'Keterangan',
+      render: (t) => (
+        <span className="text-muted">
+          {t.note || '—'}
+          {t.receiptUrl && (
+            <>
+              {t.note ? ' · ' : ''}
+              <a
+                href={t.receiptUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link inline-flex items-center gap-1"
+              >
+                <Icon name="image" size={14} /> Bukti
+              </a>
+            </>
+          )}
+        </span>
+      ),
+    },
     { key: 'by', header: 'Dicatat oleh', hideOnMobile: true, render: (t) => <span className="text-muted">{t.recordedBy}</span> },
     ...(isManager
       ? [
@@ -443,20 +484,40 @@ export function TreasuryPage() {
             <label className="flex cursor-pointer items-center gap-3 rounded-control border border-dashed border-line bg-bg/50 px-3 py-3 text-sm text-muted hover:border-primary/40">
               <Icon name="image" size={19} />
               <span className="min-w-0 flex-1 truncate">
-                {form.receiptName || 'Pilih berkas gambar/PDF…'}
+                {uploadingReceipt ? 'Mengunggah…' : form.receiptName || 'Pilih berkas gambar/PDF…'}
               </span>
               <input
                 type="file"
                 accept="image/*,application/pdf"
                 className="sr-only"
-                onChange={(e) => setForm({ ...form, receiptName: e.target.files?.[0]?.name })}
+                disabled={uploadingReceipt}
+                onChange={(e) => void onReceiptChange(e)}
               />
               <span className="flex-none rounded-control border border-line bg-surface px-2.5 py-1 text-[12.5px] font-semibold text-ink">
-                Pilih
+                {uploadingReceipt ? 'Tunggu' : form.receiptName ? 'Ganti' : 'Pilih'}
               </span>
             </label>
+            {form.receiptUrl && (
+              <div className="mt-2 flex items-center gap-4 text-[12.5px]">
+                <a
+                  href={form.receiptUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link inline-flex items-center gap-1.5"
+                >
+                  <Icon name="eye" size={15} /> Lihat bukti terunggah
+                </a>
+                <button
+                  type="button"
+                  className="text-muted hover:text-danger"
+                  onClick={() => setForm((f) => ({ ...f, receiptName: undefined, receiptUrl: undefined }))}
+                >
+                  Hapus
+                </button>
+              </div>
+            )}
             <p className="field-helper">
-              Pada prototype, berkas tidak diunggah. Penyimpanan bukti memerlukan layanan penyimpanan (mis. S3/Cloud Storage).
+              Berkas gambar atau PDF (maks. 5 MB) diunggah ke server dan disimpan sebagai bukti transaksi.
             </p>
           </div>
 

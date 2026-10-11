@@ -19,6 +19,24 @@ export const env = {
     .map((origin) => origin.trim())
     .filter(Boolean),
   cookieSecure: process.env.COOKIE_SECURE === 'true',
+
+  // ---- URL aplikasi publik (dipakai pada tautan email, mis. reset password) ----
+  publicAppUrl: (process.env.PUBLIC_APP_URL ?? 'http://localhost:5173').replace(/\/+$/, ''),
+
+  // ---- Email (SMTP). Bila SMTP_HOST kosong, email ditulis ke log server. ----
+  smtpHost: process.env.SMTP_HOST ?? '',
+  smtpPort: Number(process.env.SMTP_PORT ?? 587),
+  smtpUser: process.env.SMTP_USER ?? '',
+  smtpPass: process.env.SMTP_PASS ?? '',
+  smtpSecure: process.env.SMTP_SECURE === 'true',
+  mailFrom: process.env.MAIL_FROM ?? 'WISANGGENI CLIMBING CLUB <no-reply@wcc.id>',
+  /** Email pengurus yang menerima notifikasi pendaftaran baru (opsional). */
+  registrationNotifyEmail: process.env.REGISTRATION_NOTIFY_EMAIL ?? '',
+
+  // ---- Penyimpanan berkas (unggahan) ----
+  uploadDir: process.env.UPLOAD_DIR ?? 'uploads',
+  uploadMaxMb: Number(process.env.UPLOAD_MAX_MB ?? 5),
+
   // ---- Google Sheets (poin 3) ----
   googleSheetsId: process.env.GOOGLE_SHEETS_ID ?? '',
   googleSheetsTab: process.env.GOOGLE_SHEETS_TAB ?? 'Kas',

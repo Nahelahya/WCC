@@ -101,6 +101,7 @@ Mengembalikan data ke kondisi awal:
 | `/daftar/status` | Cek status pendaftaran berdasarkan email |
 | `/masuk` | Login (email, password, tampil/sembunyikan, ingat saya, lupa password) |
 | `/lupa-password` | Permintaan reset password |
+| `/reset-password?token=…` | Halaman tujuan tautan email untuk membuat password baru |
 
 ### Aplikasi (setelah login)
 | Rute | Anggota | Coach | Pengurus |
@@ -160,7 +161,9 @@ relasional yang dipakai (lihat skema di `server/src/db/migrations/001_init.sql`)
 | `GET` | `/api/auth/me` | `authApi.me()` |
 | `POST` | `/api/auth/refresh` | (otomatis oleh klien) rotasi refresh token |
 | `POST` | `/api/auth/logout` | `authApi.logout()` — cabut refresh token |
-| `POST` | `/api/auth/forgot-password` | `authApi.requestPasswordReset(email)` |
+| `POST` | `/api/auth/forgot-password` | `authApi.requestPasswordReset(email)` — kirim tautan reset (rate limit 5/15 menit) |
+| `GET` | `/api/auth/reset-password?token=…` | `authApi.verifyResetToken(token)` — cek tautan masih berlaku |
+| `POST` | `/api/auth/reset-password` | `authApi.resetPassword(token, password)` — set password baru, cabut sesi lama |
 | `GET` | `/api/health` | cek status server |
 
 **Autentikasi**: access token JWT berumur pendek pada cookie `wcc_at` (HttpOnly, SameSite=Lax) +
@@ -221,7 +224,8 @@ disimpan pada `localStorage` (mode mock dulu memakai `wcc.token`; kini tidak lag
 | `GET` | `/api/audit-logs?action=…&entity=…` | `auditApi.list()` — jejak audit kas (khusus pengurus) |
 | `GET` | `/api/sync/status` | `syncApi.get()` — plus `configured`, `reason`, `tab`, `columns` |
 | `POST` | `/api/sync/run` | `syncApi.run()` — sinkron nyata; **200** sukses, **503** belum dikonfigurasi, **502** bila Google gagal |
-| `POST` | `/api/uploads` | (belum dipakai) unggah bukti transaksi & foto coach |
+| `POST` | `/api/uploads` | `uploadApi.upload(file)` — unggah bukti transaksi / foto coach (multipart, field `file`, maks 5 MB) |
+| `GET` | `/uploads/:file` | penyajian berkas hasil unggahan (statis, tanpa autentikasi) |
 
 Struktur kolom spreadsheet: `Tanggal | Tipe | Kategori | Nominal | Keterangan | Dicatat Oleh`.
 
@@ -241,12 +245,18 @@ Struktur kolom spreadsheet: `Tanggal | Tipe | Kategori | Nominal | Keterangan | 
    diminta dari Anda: **berkas Service Account JSON** + **ID spreadsheet**, lalu **bagikan** spreadsheet
    ke email service account sebagai Editor. Sinkronisasi otomatis terjadwal dapat diaktifkan lewat
    `SHEETS_SYNC_INTERVAL_MINUTES`.
-4. **Layanan email** (SMTP/SendGrid/Resend) untuk reset password dan notifikasi pendaftaran.
-5. **Penyimpanan berkas** (S3/Cloud Storage/GCS) untuk **bukti transaksi** dan **foto coach**
-   — saat ini kolom unggah sengaja dinonaktifkan.
+4. ✅ **Layanan email** — kode **selesai**: modul `server/src/lib/mailer.ts` mengirim lewat **SMTP**
+   (nodemailer) bila `SMTP_HOST` diisi, dan otomatis beralih ke **mode log** (isi email dicetak ke
+   konsol server) bila belum. Dipakai untuk **reset password** dan **notifikasi pendaftaran**
+   (diterima / diverifikasi / ditolak). Yang tinggal dari Anda: **kredensial SMTP** (host, port,
+   user, password) atau penyedia seperti SendGrid/Resend.
+5. ✅ **Penyimpanan berkas** — kode **selesai**: unggahan disimpan di disk server (`UPLOAD_DIR`,
+   default `server/uploads/`) dan disajikan lewat `/uploads/:file`; kolom `receipt_url` (bukti
+   transaksi) & `photo_url` (foto coach) kini terisi. Untuk produksi tinggal ganti penyimpanan ke
+   **object storage** (S3/GCS) atau pasang **volume persisten** + backup.
 6. **Domain & hosting** (mis. Vercel/Netlify untuk frontend, VPS/Cloud Run untuk API) + HTTPS.
 7. **Kebijakan privasi & persetujuan pemrosesan data pribadi** (formulir pendaftaran sudah menyertakannya).
-8. **Audit log transaksi kas** (siapa, kapan, perubahan apa) di sisi server.
+8. ✅ **Audit log transaksi kas** (siapa, kapan, perubahan apa) — selesai, lihat `/app/audit`.
 
 ### Aset & konten
 9. **Logo**: sudah dipakai dari `WCC.png` yang Anda kirim → `public/logo-wcc.png`
@@ -296,6 +306,9 @@ server/                      # BACKEND
     env.ts                 # pembacaan variabel lingkungan
     types.ts
     lib/                   # errors, async, ids, password, tokens, time, mappers
+      mailer.ts            # pengiriman email (SMTP via nodemailer; fallback: log konsol)
+      emails.ts            # template email (reset password, notifikasi pendaftaran)
+      uploads.ts           # penyimpanan berkas disk lokal (multer) + URL publik
       sheets.ts            # klien Google Sheets API v4 (service account JWT)
     services/
       syncService.ts       # orkestrasi sinkronisasi + rekonsiliasi + log
@@ -307,7 +320,8 @@ server/                      # BACKEND
       sheets-check.ts      # diagnostik koneksi Google Sheets
     middleware/            # auth.ts (JWT/cookie/RBAC), error.ts
     routes/                # auth, users, sessions+attendance, announcements,
-                           # coaches, registrations, transactions, sync, dashboard
+                           # coaches, registrations, transactions, audit, uploads,
+                           # sync, dashboard
   docker-compose.yml       # (di root) PostgreSQL 16
 ```
 
@@ -319,6 +333,11 @@ server/                      # BACKEND
   akan mengembalikan data contoh, dan data contoh “digeser” otomatis setiap hari agar sesi
   berlangsung selalu tersedia untuk mendemokan check-in.
 - Token sesi **hanya** pada cookie HttpOnly; `localStorage` tidak lagi dipakai pada mode live.
+- **Email**: bila `SMTP_HOST` belum diisi, email (mis. tautan reset password) **dicetak ke konsol
+  server** agar alur tetap dapat diuji. Isi kredensial SMTP pada `server/.env` untuk pengiriman nyata.
+- **Unggahan berkas**: tersimpan di folder `server/uploads/` (diabaikan git) dan disajikan di
+  `/uploads/...`. Pada dev, Vite mem-proxy `/uploads` ke backend. Untuk produksi gunakan object
+  storage atau volume persisten.
 - Ekspor PDF memakai dialog cetak peramban (pilih “Simpan sebagai PDF”); produksi sebaiknya memakai
   pustaka PDF di sisi server.
 

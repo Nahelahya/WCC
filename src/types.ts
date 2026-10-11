@@ -1,4 +1,5 @@
-export type Role = 'anggota' | 'coach' | 'pengurus'
+﻿export type Role = 'anggota' | 'coach' | 'pengurus'
+import type { LandingContent } from './types.landing'
 
 export interface User {
   id: string
@@ -81,6 +82,7 @@ export interface Transaction {
   note: string
   recordedBy: string
   receiptName?: string
+  receiptUrl?: string
   createdAt: string
 }
 
@@ -130,6 +132,7 @@ export interface Database {
   registrations: Registration[]
   transactions: Transaction[]
   auditLogs: AuditLogEntry[]
+  landing: LandingContent
   sync: SyncState
 }
 

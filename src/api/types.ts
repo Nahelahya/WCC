@@ -33,3 +33,11 @@ export interface TreasurySummary {
   income: number
   expense: number
 }
+
+export interface UploadResult {
+  /** URL publik berkas (mis. `/uploads/abc.png` atau data URL pada mode mock). */
+  url: string
+  name: string
+  size: number
+  mime: string
+}

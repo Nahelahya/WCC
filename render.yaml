@@ -1,0 +1,62 @@
+# Render Blueprint - Full Stack WCC App
+# Lihat: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: wcc-app
+    runtime: node
+    plan: free
+    buildCommand: |
+      cd server && npm install && npm run build
+      cd .. && npm install && npm run build
+    startCommand: cd server && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ACCESS_TOKEN_TTL
+        value: 15m
+      - key: REFRESH_TOKEN_DAYS
+        value: "30"
+      - key: CORS_ORIGIN
+        sync: false
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: PUBLIC_APP_URL
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        value: "WISANGGENI CLIMBING CLUB <nahelahya4@gmail.com>"
+      - key: REGISTRATION_NOTIFY_EMAIL
+        sync: false
+      - key: UPLOAD_DIR
+        value: uploads
+      - key: UPLOAD_MAX_MB
+        value: "5"
+      - key: GOOGLE_SHEETS_ID
+        sync: false
+      - key: GOOGLE_SHEETS_TAB
+        value: Kas
+      - key: GOOGLE_SERVICE_ACCOUNT_FILE
+        value: ""
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: SHEETS_SYNC_INTERVAL_MINUTES
+        value: "0"
+      - key: SHEETS_REQUEST_TIMEOUT_MS
+        value: "15000"

@@ -18,6 +18,8 @@ export const API_MODE: 'mock' | 'live' = import.meta.env.VITE_API_MODE === 'live
 const impl: typeof mock = API_MODE === 'live' ? live : mock
 
 export const authApi = impl.authApi
+export const uploadApi = impl.uploadApi
+export const landingApi = impl.landingApi
 export const userApi = impl.userApi
 export const sessionApi = impl.sessionApi
 export const attendanceApi = impl.attendanceApi
@@ -32,4 +34,4 @@ export const statsApi = impl.statsApi
 // Password akun demo yang dipakai halaman masuk (sama untuk mock & API).
 export const DEMO_PASSWORD = impl.DEMO_PASSWORD
 
-export type { AttendanceRow, AuthSession, SessionInput, TreasurySummary } from './types'
+export type { AttendanceRow, AuthSession, SessionInput, TreasurySummary, UploadResult } from './types'

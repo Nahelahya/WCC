@@ -209,6 +209,7 @@ export interface TransactionRow extends QueryResultRow {
   note: string
   recorded_by: string
   receipt_name: string | null
+  receipt_url: string | null
   created_at: Date | string
 }
 
@@ -222,6 +223,7 @@ export function mapTransaction(row: TransactionRow) {
     note: row.note,
     recordedBy: row.recorded_by,
     receiptName: row.receipt_name ?? undefined,
+    receiptUrl: row.receipt_url ?? undefined,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
   }
 }

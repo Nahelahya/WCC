@@ -2,6 +2,8 @@ import { createApp } from './app'
 import { pool } from './db/pool'
 import { env } from './env'
 import { getSheetsConfig } from './lib/sheets'
+import { mailerStatus } from './lib/mailer'
+import { uploadDir } from './lib/uploads'
 import { runSync } from './services/syncService'
 
 const app = createApp()
@@ -14,6 +16,8 @@ const server = app.listen(env.port, () => {
   console.log(`  Environment : ${env.nodeEnv}`)
   console.log(`  Database    : ${maskedDb}`)
   console.log(`  CORS origin : ${env.corsOrigins.join(', ')}`)
+  console.log(`  Email       : ${mailerStatus()}`)
+  console.log(`  Unggahan    : ${uploadDir()}`)
   console.log(
     `  Google Sheets: ${
       sheets.configured ? `aktif (tab "${sheets.tab}")` : `belum dikonfigurasi — ${sheets.reason}`

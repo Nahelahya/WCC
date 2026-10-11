@@ -3,6 +3,8 @@ import { pool } from './pool'
 const TABLES = [
   'attendance',
   'refresh_tokens',
+  'password_reset_tokens',
+  'otp_codes',
   'audit_logs',
   'registrations',
   'transactions',

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { coachApi, sessionApi } from '@/api/client'
+import { coachApi, sessionApi, uploadApi } from '@/api/client'
 import { useToast } from '@/context/ToastContext'
 import { useAsync, errorMessage } from '@/lib/hooks'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -18,6 +18,7 @@ interface FormState {
   experience: string
   years: string
   bio: string
+  photoUrl?: string
 }
 
 const EMPTY: FormState = { name: '', expertise: '', experience: '', years: '1', bio: '' }
@@ -33,6 +34,7 @@ export function CoachAdminPage() {
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Coach | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
   const counts = useMemo(() => {
     const map: Record<string, number> = {}
@@ -56,9 +58,26 @@ export function CoachAdminPage() {
       experience: c.experience,
       years: String(c.years),
       bio: c.bio ?? '',
+      photoUrl: c.photoUrl,
     })
     setErrors({})
     setFormOpen(true)
+  }
+
+  async function onPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploadingPhoto(true)
+    try {
+      const res = await uploadApi.upload(file)
+      setForm((f) => ({ ...f, photoUrl: res.url }))
+      toast('Foto coach berhasil diunggah.', 'success')
+    } catch (err) {
+      toast(errorMessage(err), 'error')
+    } finally {
+      setUploadingPhoto(false)
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -84,6 +103,7 @@ export function CoachAdminPage() {
         experience: form.experience,
         years: Number(form.years),
         bio: form.bio,
+        photoUrl: form.photoUrl,
       })
       toast(form.id ? 'Data coach berhasil diperbarui.' : 'Coach baru berhasil ditambahkan.', 'success')
       setFormOpen(false)
@@ -213,11 +233,45 @@ export function CoachAdminPage() {
             onChange={(e) => setForm({ ...form, bio: e.target.value })}
             placeholder="Fokus pembinaan atau spesialisasi (opsional)."
           />
-          <div className="flex items-start gap-2.5 rounded-control border border-line bg-bg/60 p-3">
-            <Icon name="info" size={17} className="mt-0.5 flex-none text-info" />
-            <p className="text-[12.5px] text-muted">
-              Unggah foto coach belum diaktifkan pada prototype ini karena penyimpanan berkas belum tersedia.
-              Bidang foto akan ditambahkan setelah API penyimpanan gambar siap.
+          <div>
+            <span className="field-label">Foto coach (opsional)</span>
+            <div className="flex items-center gap-3">
+              <span className="flex h-16 w-16 flex-none items-center justify-center overflow-hidden rounded-control border border-line bg-bg">
+                {form.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={form.photoUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <Icon name="users" size={22} className="text-muted" />
+                )}
+              </span>
+              <label className="flex flex-1 cursor-pointer items-center gap-3 rounded-control border border-dashed border-line bg-bg/50 px-3 py-3 text-sm text-muted hover:border-primary/40">
+                <Icon name="image" size={19} />
+                <span className="min-w-0 flex-1 truncate">
+                  {uploadingPhoto ? 'Mengunggah…' : form.photoUrl ? 'Foto terunggah' : 'Pilih foto (PNG/JPG)'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={uploadingPhoto}
+                  onChange={(e) => void onPhotoChange(e)}
+                />
+                <span className="flex-none rounded-control border border-line bg-surface px-2.5 py-1 text-[12.5px] font-semibold text-ink">
+                  {uploadingPhoto ? 'Tunggu' : form.photoUrl ? 'Ganti' : 'Pilih'}
+                </span>
+              </label>
+            </div>
+            {form.photoUrl && (
+              <button
+                type="button"
+                className="mt-2 text-[12.5px] text-muted hover:text-danger"
+                onClick={() => setForm((f) => ({ ...f, photoUrl: undefined }))}
+              >
+                Hapus foto
+              </button>
+            )}
+            <p className="field-helper">
+              Foto akan tampil pada kartu coach. Format gambar, maksimal 5 MB.
             </p>
           </div>
         </form>

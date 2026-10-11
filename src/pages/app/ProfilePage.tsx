@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { API_MODE, attendanceApi, syncApi, userApi } from '@/api/client'
+import { API_MODE, attendanceApi, syncApi, uploadApi, userApi } from '@/api/client'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useAsync, errorMessage } from '@/lib/hooks'
@@ -35,6 +35,8 @@ export function ProfilePage() {
 
   const [resetOpen, setResetOpen] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [removingPhoto, setRemovingPhoto] = useState(false)
 
   const rows = history.data ?? []
   const hadir = rows.filter((r) => r.status === 'hadir').length
@@ -96,6 +98,44 @@ export function ProfilePage() {
     }
   }
 
+  async function onPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast('Format file tidak valid. Gunakan JPG, PNG, WebP, atau GIF.', 'error')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Ukuran foto maksimal 5 MB.', 'error')
+      return
+    }
+    setUploadingPhoto(true)
+    try {
+      const { url } = await uploadApi.upload(file)
+      const updated = await userApi.updateProfile(user!.id, { photoUrl: url })
+      setUser(updated)
+      toast('Foto profil berhasil diperbarui.', 'success')
+    } catch (err) {
+      toast(errorMessage(err), 'error')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  async function removePhoto() {
+    setRemovingPhoto(true)
+    try {
+      const updated = await userApi.updateProfile(user!.id, { photoUrl: '' })
+      setUser(updated)
+      toast('Foto profil berhasil dihapus.', 'success')
+    } catch (err) {
+      toast(errorMessage(err), 'error')
+    } finally {
+      setRemovingPhoto(false)
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -106,7 +146,22 @@ export function ProfilePage() {
       {/* Kartu identitas */}
       <div className="card mb-6 p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <Avatar user={user!} size={72} />
+          <div className="relative flex-none">
+            <Avatar user={user!} size={72} />
+            <label
+              className="absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-line bg-surface text-primary shadow-sm transition hover:bg-bg disabled:opacity-60"
+              title="Ubah foto profil"
+            >
+              <Icon name="camera" size={15} />
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                disabled={uploadingPhoto}
+                onChange={(e) => void onPhotoChange(e)}
+              />
+            </label>
+          </div>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-xl font-bold text-ink">{user!.name}</h2>
             <p className="truncate text-sm text-muted">{user!.email}</p>
@@ -123,6 +178,16 @@ export function ProfilePage() {
                 Bergabung {formatDateID(user!.joinedAt)}
               </StatusBadge>
             </div>
+            {user!.photoUrl && (
+              <button
+                type="button"
+                className="mt-2 text-[12.5px] font-medium text-muted transition hover:text-danger disabled:opacity-60"
+                onClick={() => void removePhoto()}
+                disabled={removingPhoto || uploadingPhoto}
+              >
+                {removingPhoto ? 'Menghapus…' : 'Hapus foto profil'}
+              </button>
+            )}
           </div>
           <div className="flex flex-none flex-col gap-2 sm:w-44">
             <Link to="/" className={buttonClasses('secondary', 'md', 'w-full')}>

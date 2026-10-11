@@ -68,6 +68,7 @@ const transactionSchema = z.object({
   note: z.string().optional(),
   recordedBy: z.string().optional(),
   receiptName: z.string().optional(),
+  receiptUrl: z.string().optional(),
 })
 
 async function currentUserName(userId: string): Promise<string> {
@@ -93,8 +94,8 @@ transactionRouter.post(
     const input = transactionSchema.parse(req.body ?? {})
     const recordedBy = input.recordedBy ?? (await currentUserName(req.auth!.userId))
     const { rows } = await query<TransactionRow>(
-      `insert into transactions (id, date, type, category, amount, note, recorded_by, receipt_name, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8, now())
+      `insert into transactions (id, date, type, category, amount, note, recorded_by, receipt_name, receipt_url, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
        returning *`,
       [
         newId('t'),
@@ -105,6 +106,7 @@ transactionRouter.post(
         input.note ?? '',
         recordedBy,
         input.receiptName ?? null,
+        input.receiptUrl ?? null,
       ],
     )
     await writeAudit({
@@ -135,7 +137,8 @@ transactionRouter.patch(
          category     = coalesce($4, category),
          amount       = coalesce($5, amount),
          note         = coalesce($6, note),
-         receipt_name = coalesce($7, receipt_name)
+         receipt_name = coalesce($7, receipt_name),
+         receipt_url  = coalesce($8, receipt_url)
        where id = $1
        returning *`,
       [
@@ -146,6 +149,7 @@ transactionRouter.patch(
         patch.amount ?? null,
         patch.note ?? null,
         patch.receiptName ?? null,
+        patch.receiptUrl ?? null,
       ],
     )
     if (!rows[0]) throw ApiError.notFound('Transaksi tidak ditemukan.')

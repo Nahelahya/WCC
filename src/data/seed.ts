@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Announcement,
   Attendance,
   AuditLogEntry,
@@ -142,7 +142,7 @@ function sessions(): Session[] {
   const list: Session[] = [
     {
       id: 's-ongoing',
-      title: 'Latihan Rutin — Lead & Bouldering',
+      title: 'Latihan Rutin â€” Lead & Bouldering',
       date: today,
       startTime: nowHHMM(-25),
       endTime: nowHHMM(95),
@@ -171,7 +171,7 @@ function sessions(): Session[] {
     },
     {
       id: 's-t2',
-      title: 'Speed Climbing — Sesi Reaksi',
+      title: 'Speed Climbing â€” Sesi Reaksi',
       date: addDays(today, 2),
       startTime: '16:00',
       endTime: '18:00',
@@ -190,7 +190,7 @@ function sessions(): Session[] {
     },
     {
       id: 's-t4',
-      title: 'Latihan Rutin — Lead',
+      title: 'Latihan Rutin â€” Lead',
       date: addDays(today, 5),
       startTime: '19:00',
       endTime: '21:00',
@@ -199,7 +199,7 @@ function sessions(): Session[] {
     },
     {
       id: 's-h1',
-      title: 'Latihan Rutin — Bouldering',
+      title: 'Latihan Rutin â€” Bouldering',
       date: addDays(today, -2),
       startTime: '19:00',
       endTime: '21:00',
@@ -217,7 +217,7 @@ function sessions(): Session[] {
     },
     {
       id: 's-h3',
-      title: 'Latihan Rutin — Lead',
+      title: 'Latihan Rutin â€” Lead',
       date: addDays(today, -6),
       startTime: '19:00',
       endTime: '21:00',
@@ -235,7 +235,7 @@ function sessions(): Session[] {
     },
     {
       id: 's-h5',
-      title: 'Latihan Rutin — Bouldering',
+      title: 'Latihan Rutin â€” Bouldering',
       date: addDays(today, -11),
       startTime: '19:00',
       endTime: '21:00',
@@ -244,7 +244,7 @@ function sessions(): Session[] {
     },
     {
       id: 's-h6',
-      title: 'Latihan Rutin — Lead',
+      title: 'Latihan Rutin â€” Lead',
       date: addDays(today, -13),
       startTime: '19:00',
       endTime: '21:00',
@@ -485,6 +485,7 @@ export function createSeedDatabase(): Database {
     registrations,
     transactions: transactions(),
     auditLogs: auditLogs(),
+    landing: defaultLandingMock(),
     sync: {
       status: 'success',
       lastSyncAt: isoMinutesAgo(240),
@@ -557,3 +558,82 @@ export function refreshDemoDates(db: Database): Database {
 export function isSameDay(a: string, b: string): boolean {
   return toISO(new Date(a)) === toISO(new Date(b))
 }
+
+function defaultLandingMock(): any {
+  return {
+    hero: {
+      title: 'WISANGGENI CLIMBING CLUB',
+      subtitle: 'Komunitas panjat tebing yang mengedepankan kebersamaan, pembinaan berkelanjutan dan keselamatan.',
+      ctaPrimaryLabel: 'Gabung Sekarang',
+      ctaPrimaryHref: '/daftar',
+      ctaSecondaryLabel: 'Lihat Jadwal',
+      ctaSecondaryHref: '/#jadwal',
+    },
+    about: {
+      badge: 'Tentang Kami',
+      title: 'Wujudkan potensi panjat tebing Anda bersama komunitas solid',
+      description: 'WISANGGENI CLIMBING CLUB fokus pada pembinaan teknis, keselamatan dan budaya saling mendukung.',
+      stats: [
+        { label: 'Anggota Aktif', value: '50+' },
+        { label: 'Sesi Latihan/Bulan', value: '12+' },
+        { label: 'Coach Bersertifikasi', value: '3' },
+        { label: 'Tahun Berdiri', value: '5+' },
+      ],
+    },
+    schedule: {
+      badge: 'Jadwal Latihan',
+      title: 'Latihan rutin setiap minggu',
+      description: 'Ikuti sesi latihan terjadwal bersama coach.',
+      items: [
+        { day: 'Selasa', time: '19.00 – 21.00 WIB', activity: 'Latihan Teknik & Bouldering' },
+        { day: 'Kamis', time: '19.00 – 21.00 WIB', activity: 'Lead Climbing & Safety' },
+        { day: 'Sabtu', time: '09.00 – 12.00 WIB', activity: 'Open Wall & Sparing Session' },
+      ],
+    },
+    coaches: { badge: 'Tim Coach', title: 'Dibimbing coach berpengalaman', description: '', items: [] },
+    steps: {
+      badge: 'Cara Bergabung',
+      title: 'Empat langkah menjadi anggota',
+      description: '',
+      items: [
+        { title: 'Isi Formulir', desc: 'Lengkapi data diri.' },
+        { title: 'Verifikasi Email', desc: 'Masukkan kode OTP.' },
+        { title: 'Verifikasi Pendaftaran', desc: 'Konfirmasi oleh pengurus.' },
+        { title: 'Mulai Latihan', desc: 'Gabung sesi rutin.' },
+      ],
+    },
+    activities: { badge: 'Kegiatan Klub', title: 'Foto kegiatan komunitas', description: '', items: [] },
+    cta: {
+      title: 'Siap mulai latihan bersama kami?',
+      description: 'Buat akun dan catat kehadiran digital.',
+      ctaPrimaryLabel: 'Gabung Sekarang',
+      ctaPrimaryHref: '/daftar',
+      ctaSecondaryLabel: 'Sudah punya akun? Masuk',
+      ctaSecondaryHref: '/masuk',
+    },
+    footer: {
+      description: 'Komunitas panjat tebing untuk latihan rutin, pembinaan dan kebersamaan.',
+      contact: { address: 'Dinding Panjat FPTI, GOR Utama', email: 'halo@wisanggeniclub.id', phone: '0812-0000-0000' },
+      sections: [
+        {
+          title: 'Informasi',
+          links: [
+            { label: 'Tentang Klub', href: '/#tentang' },
+            { label: 'Jadwal Latihan', href: '/#jadwal' },
+            { label: 'Profil Coach', href: '/coach' },
+            { label: 'Cara Bergabung', href: '/cara-bergabung' },
+            { label: 'Kebijakan Privasi', href: '/kebijakan-privasi' },
+          ],
+        },
+        { title: 'Anggota', links: [{ label: 'Login', href: '/masuk' }, { label: 'Daftar', href: '/daftar' }, { label: 'Cek Status', href: '/daftar/status' }] },
+      ],
+      copyright: "© 2026 WISANGGENI CLIMBING CLUB. Prototype UI sesuai dokumen desain v1.0.",
+    },
+  }
+}
+
+
+
+
+
+

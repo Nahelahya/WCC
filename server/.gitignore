@@ -3,6 +3,9 @@ dist/
 .env
 *.log
 
+# Berkas unggahan (bukti transaksi, foto coach) — jangan di-commit
+uploads/
+
 # Kredensial Google — jangan pernah di-commit
 service-account*.json
 *service-account*.json

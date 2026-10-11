@@ -10,7 +10,8 @@ import type {
   Transaction,
   User,
 } from '@/types'
-import type { AttendanceRow, AuthSession, SessionInput, TreasurySummary } from './types'
+import type { AttendanceRow, AuthSession, SessionInput, TreasurySummary, UploadResult } from './types'
+import type { LandingContent } from '@/types.landing'
 
 /**
  * Klien API asli. Memanggil backend Express + PostgreSQL yang ada di folder
@@ -36,7 +37,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       credentials: 'include',
       ...init,
       headers: {
-        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        // Jangan set Content-Type untuk FormData — peramban yang menetapkan boundary.
+        ...(init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
         ...(init.headers ?? {}),
       },
     })
@@ -112,6 +114,32 @@ export const authApi = {
       body: JSON.stringify({ email }),
     })
   },
+
+  async verifyOtp(email: string, purpose: 'password_reset' | 'email_verify', otp: string): Promise<{ verified: boolean }> {
+    return request('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, purpose, otp }),
+    })
+  },
+
+  async resetPassword(email: string, otp: string, password: string): Promise<void> {
+    await request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp, password }),
+    })
+  },
+}
+
+/* ------------------------------------------------------------------ */
+/* Unggah berkas                                                       */
+/* ------------------------------------------------------------------ */
+
+export const uploadApi = {
+  async upload(file: File): Promise<UploadResult> {
+    const form = new FormData()
+    form.append('file', file)
+    return request('/uploads', { method: 'POST', body: form })
+  },
 }
 
 /* ------------------------------------------------------------------ */
@@ -124,7 +152,7 @@ export const userApi = {
   },
   async updateProfile(
     userId: string,
-    patch: Partial<Pick<User, 'name' | 'phone' | 'email'>>,
+    patch: Partial<Pick<User, 'name' | 'phone' | 'email' | 'photoUrl'>>,
   ): Promise<User> {
     return request(`/users/${encodeURIComponent(userId)}`, {
       method: 'PATCH',
@@ -385,3 +413,16 @@ export const statsApi = {
     return request(`/sessions/${encodeURIComponent(sessionId)}/summary`)
   },
 }
+
+export const landingApi = {
+  async get(): Promise<any> {
+    return request('/landing')
+  },
+  async update(data: any): Promise<any> {
+    return request('/landing', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
+}
+

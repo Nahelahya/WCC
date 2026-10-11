@@ -13,7 +13,7 @@ import type {
 import { createSeedDatabase, DB_KEY, DB_VERSION, refreshDemoDates } from '@/data/seed'
 import { todayISO } from '@/lib/date'
 import { canCheckIn } from '@/lib/session'
-import type { AttendanceRow, AuthSession, SessionInput, TreasurySummary } from './types'
+import type { AttendanceRow, AuthSession, SessionInput, TreasurySummary, UploadResult } from './types'
 
 /**
  * Lapisan API tiruan (mock) untuk prototype.
@@ -136,6 +136,31 @@ export const authApi = {
       message: `Jika ${email} terdaftar, kami telah mengirim tautan pemulihan ke email tersebut.`,
     })
   },
+
+  async verifyOtp(_email: string, _purpose: 'password_reset' | 'email_verify', _otp: string): Promise<{ verified: boolean }> {
+    return delay({ verified: true })
+  },
+
+  async resetPassword(_email: string, _otp: string, password: string): Promise<void> {
+    if (password.length < 8) return fail('Password baru minimal 8 karakter.')
+    return delay(undefined)
+  },
+}
+
+/* ------------------------------------------------------------------ */
+/* Unggah berkas (mode demo: disimpan sebagai data URL)                */
+/* ------------------------------------------------------------------ */
+
+export const uploadApi = {
+  async upload(file: File): Promise<UploadResult> {
+    const url = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(new Error('Gagal membaca berkas.'))
+      reader.readAsDataURL(file)
+    })
+    return delay({ url, name: file.name, size: file.size, mime: file.type }, 180)
+  },
 }
 
 /* ------------------------------------------------------------------ */
@@ -148,7 +173,7 @@ export const userApi = {
   },
   async updateProfile(
     userId: string,
-    patch: Partial<Pick<User, 'name' | 'phone' | 'email'>>,
+    patch: Partial<Pick<User, 'name' | 'phone' | 'email' | 'photoUrl'>>,
   ): Promise<User> {
     return delay(
       mutate((db) => {
@@ -487,6 +512,7 @@ export const treasuryApi = {
           note: input.note ?? '',
           recordedBy: input.recordedBy ?? 'Pengurus',
           receiptName: input.receiptName,
+          receiptUrl: input.receiptUrl,
           createdAt: new Date().toISOString(),
         }
         db.transactions.push(created)
@@ -646,3 +672,18 @@ export const statsApi = {
     })
   },
 }
+
+export const landingApi = {
+  async get(): Promise<any> {
+    return delay({ ...read().landing, updatedAt: new Date().toISOString(), updatedByName: 'Pengurus Demo' })
+  },
+  async update(data: any): Promise<any> {
+    return delay(
+      mutate((db: any) => {
+        db.landing = JSON.parse(JSON.stringify(data))
+        return { ...db.landing, updatedAt: new Date().toISOString(), updatedByName: 'Pengurus Demo' }
+      }),
+    )
+  },
+}
+

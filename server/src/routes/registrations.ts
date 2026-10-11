@@ -5,6 +5,9 @@ import { ApiError } from '../lib/errors'
 import { wrap } from '../lib/async'
 import { mapRegistration, type RegistrationRow } from '../lib/mappers'
 import { newId } from '../lib/ids'
+import { sendMail } from '../lib/mailer'
+import { emailVerifyOtpEmail, registrationDecisionEmail, registrationReceivedEmail } from '../lib/emails'
+import { generateOtp, hashOtp } from '../lib/otp'
 import { requireAuth, requireRole } from '../middleware/auth'
 
 export const registrationRouter = Router()
@@ -32,6 +35,28 @@ registrationRouter.post(
        returning *`,
       [newId('r'), input.fullName, input.email, input.phone, input.experience, input.motivation ?? null],
     )
+    // Kirim email konfirmasi & OTP verifikasi email
+    void sendMail(registrationReceivedEmail(rows[0].email, rows[0].full_name)).catch((err: unknown) =>
+      console.error('Gagal mengirim email konfirmasi pendaftaran:', err),
+    )
+    void (async () => {
+      try {
+        // Batalkan OTP email_verify lama untuk email ini yang belum dipakai
+        await query(
+          `update otp_codes set used_at = now() where lower(email)=lower($1) and purpose='email_verify' and used_at is null and verified_at is null`,
+          [rows[0].email],
+        )
+        const otp = generateOtp(8)
+        await query(
+          `insert into otp_codes (id, purpose, email, otp_hash, expires_at, max_tries)
+           values ($1, 'email_verify', $2, $3, now() + make_interval(mins => 5), 5)`,
+          [newId('otp'), rows[0].email, hashOtp(otp)],
+        )
+        await sendMail(emailVerifyOtpEmail(rows[0].email, rows[0].full_name, otp))
+      } catch (err) {
+        console.error('Gagal mengirim OTP verifikasi email pendaftaran:', err)
+      }
+    })()
     res.status(201).json(mapRegistration(rows[0]))
   }),
 )
@@ -95,6 +120,9 @@ registrationRouter.patch(
       })
       .parse(req.body ?? {})
 
+    const { rows: previous } = await query<RegistrationRow>('select * from registrations where id = $1', [
+      req.params.id,
+    ])
     const { rows } = await query<RegistrationRow>(
       `update registrations
        set status = $2, internal_note = coalesce($3, internal_note)
@@ -103,6 +131,14 @@ registrationRouter.patch(
       [req.params.id, status, internalNote ?? null],
     )
     if (!rows[0]) throw ApiError.notFound('Pendaftaran tidak ditemukan.')
+
+    // Kirim email keputusan hanya bila status benar-benar berubah ke hasil final.
+    const changed = previous[0]?.status !== rows[0].status
+    if ((rows[0].status === 'diverifikasi' || rows[0].status === 'ditolak') && changed) {
+      void sendMail(
+        registrationDecisionEmail(rows[0].email, rows[0].full_name, rows[0].status, rows[0].internal_note ?? undefined),
+      ).catch((err: unknown) => console.error('Gagal mengirim email keputusan pendaftaran:', err))
+    }
     res.json(mapRegistration(rows[0]))
   }),
 )
