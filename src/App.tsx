@@ -16,6 +16,7 @@ import { RegistrationsPage } from '@/pages/app/admin/RegistrationsPage'
 import { TreasuryPage } from '@/pages/app/admin/TreasuryPage'
 import { ReportsPage } from '@/pages/app/admin/ReportsPage'
 import { SyncPage } from '@/pages/app/admin/SyncPage'
+import { AuditLogPage } from '@/pages/app/admin/AuditLogPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 export function App() {
@@ -47,6 +48,7 @@ export function App() {
         <Route path="kas" element={<TreasuryPage />} />
         <Route path="laporan" element={<ReportsPage />} />
         <Route path="sinkronisasi" element={<SyncPage />} />
+        <Route path="audit" element={<AuditLogPage />} />
         <Route path="profil" element={<ProfilePage />} />
       </Route>
 

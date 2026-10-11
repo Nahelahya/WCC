@@ -42,6 +42,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/app/kas', label: 'Kas & Treasury', icon: 'wallet' },
     { to: '/app/laporan', label: 'Laporan', icon: 'chart' },
     { to: '/app/sinkronisasi', label: 'Sinkronisasi', icon: 'refresh' },
+    { to: '/app/audit', label: 'Jejak Audit', icon: 'shield' },
     { to: '/app/profil', label: 'Pengaturan/Profil', icon: 'settings' },
   ],
 }
@@ -74,6 +75,7 @@ export const ALLOWED: Record<Role, string[]> = {
     '/app/kas',
     '/app/laporan',
     '/app/sinkronisasi',
+    '/app/audit',
     '/app/profil',
   ],
 }

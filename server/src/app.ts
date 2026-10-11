@@ -5,6 +5,7 @@ import { env } from './env'
 import { attachAuth } from './middleware/auth'
 import { errorHandler, notFoundHandler } from './middleware/error'
 import { announcementRouter } from './routes/announcements'
+import { auditRouter } from './routes/audit'
 import { authRouter } from './routes/auth'
 import { coachRouter } from './routes/coaches'
 import { dashboardRouter } from './routes/dashboard'
@@ -44,6 +45,7 @@ export function createApp() {
   app.use('/api/coaches', coachRouter)
   app.use('/api/registrations', registrationRouter)
   app.use('/api/transactions', transactionRouter)
+  app.use('/api/audit-logs', auditRouter)
   app.use('/api/sync', syncRouter)
   app.use('/api', dashboardRouter)
 

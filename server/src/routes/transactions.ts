@@ -6,6 +6,7 @@ import { wrap } from '../lib/async'
 import { mapTransaction, type TransactionRow } from '../lib/mappers'
 import { newId } from '../lib/ids'
 import { requireAuth, requireRole } from '../middleware/auth'
+import { writeAudit } from '../lib/audit'
 
 export const transactionRouter = Router()
 // Semua pengguna yang login boleh MELIHAT ringkasan & daftar kas (transparansi,
@@ -74,6 +75,17 @@ async function currentUserName(userId: string): Promise<string> {
   return rows[0]?.name ?? 'Pengurus'
 }
 
+/** Bentuk ringkas satu transaksi untuk disimpan pada detail jejak audit. */
+function snapshot(row: TransactionRow) {
+  return {
+    date: row.date,
+    type: row.type,
+    category: row.category,
+    amount: Number(row.amount),
+    note: row.note,
+  }
+}
+
 transactionRouter.post(
   '/',
   requireRole('pengurus'),
@@ -95,6 +107,13 @@ transactionRouter.post(
         input.receiptName ?? null,
       ],
     )
+    await writeAudit({
+      userId: req.auth!.userId,
+      action: 'create',
+      entity: 'transaction',
+      entityId: rows[0].id,
+      detail: snapshot(rows[0]),
+    })
     res.status(201).json(mapTransaction(rows[0]))
   }),
 )
@@ -104,6 +123,11 @@ transactionRouter.patch(
   requireRole('pengurus'),
   wrap(async (req, res) => {
     const patch = transactionSchema.partial().parse(req.body ?? {})
+    const { rows: existingRows } = await query<TransactionRow>(
+      'select * from transactions where id = $1',
+      [req.params.id],
+    )
+    const before = existingRows[0]
     const { rows } = await query<TransactionRow>(
       `update transactions set
          date         = coalesce($2, date),
@@ -125,6 +149,16 @@ transactionRouter.patch(
       ],
     )
     if (!rows[0]) throw ApiError.notFound('Transaksi tidak ditemukan.')
+    await writeAudit({
+      userId: req.auth!.userId,
+      action: 'update',
+      entity: 'transaction',
+      entityId: rows[0].id,
+      detail: {
+        before: before ? snapshot(before) : null,
+        after: snapshot(rows[0]),
+      },
+    })
     res.json(mapTransaction(rows[0]))
   }),
 )
@@ -133,8 +167,20 @@ transactionRouter.delete(
   '/:id',
   requireRole('pengurus'),
   wrap(async (req, res) => {
+    const { rows: existingRows } = await query<TransactionRow>(
+      'select * from transactions where id = $1',
+      [req.params.id],
+    )
+    const removed = existingRows[0]
     const { rowCount } = await query('delete from transactions where id = $1', [req.params.id])
     if (!rowCount) throw ApiError.notFound('Transaksi tidak ditemukan.')
+    await writeAudit({
+      userId: req.auth!.userId,
+      action: 'delete',
+      entity: 'transaction',
+      entityId: req.params.id,
+      detail: removed ? snapshot(removed) : null,
+    })
     res.json({ ok: true })
   }),
 )

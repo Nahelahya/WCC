@@ -84,6 +84,20 @@ export interface Transaction {
   createdAt: string
 }
 
+export type AuditAction = 'create' | 'update' | 'delete'
+
+/** Satu baris jejak audit (PRD 10): siapa mengubah apa dan kapan. */
+export interface AuditLogEntry {
+  id: string
+  at: string // ISO datetime
+  userName: string
+  action: AuditAction
+  entity: string
+  entityId?: string
+  /** Muatan terstruktur aksi: snapshot transaksi, atau { before, after } saat ubah. */
+  detail?: Record<string, unknown> | null
+}
+
 export interface SyncLogEntry {
   id: string
   at: string
@@ -115,6 +129,7 @@ export interface Database {
   coaches: Coach[]
   registrations: Registration[]
   transactions: Transaction[]
+  auditLogs: AuditLogEntry[]
   sync: SyncState
 }
 

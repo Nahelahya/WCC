@@ -1,6 +1,7 @@
 import type {
   Announcement,
   Attendance,
+  AuditLogEntry,
   Coach,
   Registration,
   RegistrationStatus,
@@ -328,6 +329,16 @@ export const syncApi = {
       ),
       { status: 400 },
     )
+  },
+}
+
+/* ------------------------------------------------------------------ */
+/* Jejak audit transaksi kas                                           */
+/* ------------------------------------------------------------------ */
+
+export const auditApi = {
+  async list(filter?: { action?: string; entity?: string }): Promise<AuditLogEntry[]> {
+    return request(`/audit-logs${query({ action: filter?.action, entity: filter?.entity })}`)
   },
 }
 

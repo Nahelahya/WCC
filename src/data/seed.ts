@@ -1,6 +1,7 @@
 import type {
   Announcement,
   Attendance,
+  AuditLogEntry,
   Coach,
   Database,
   Registration,
@@ -10,7 +11,7 @@ import type {
 } from '@/types'
 import { addDays, todayISO, toISO } from '@/lib/date'
 
-export const DB_VERSION = 1
+export const DB_VERSION = 2
 export const DB_KEY = 'wcc.db'
 
 function nowHHMM(offsetMinutes: number): string {
@@ -438,6 +439,40 @@ function transactions(): Transaction[] {
   }))
 }
 
+function auditLogs(): AuditLogEntry[] {
+  const today = todayISO()
+  const mk = (
+    id: string,
+    minutesAgo: number,
+    userName: string,
+    action: AuditLogEntry['action'],
+    detail: Record<string, unknown>,
+  ): AuditLogEntry => ({
+    id,
+    at: isoMinutesAgo(minutesAgo),
+    userName,
+    action,
+    entity: 'transaction',
+    detail,
+  })
+
+  return [
+    mk('al4', 3 * 1440, 'Anisa Prameswari', 'update', {
+      before: { date: addDays(today, -9), type: 'pengeluaran', category: 'Peralatan', amount: 620000, note: 'Pembelian 2 set quickdraw' },
+      after: { date: addDays(today, -9), type: 'pengeluaran', category: 'Peralatan', amount: 640000, note: 'Pembelian 2 set quickdraw' },
+    }),
+    mk('al3', 5 * 1440, 'Hendra Kusuma', 'create', {
+      date: addDays(today, -5), type: 'pengeluaran', category: 'Sewa Gym', amount: 1200000, note: 'Sewa dinding FPTI bulan ini',
+    }),
+    mk('al2', 9 * 1440, 'Anisa Prameswari', 'delete', {
+      date: addDays(today, -10), type: 'pengeluaran', category: 'Konsumsi', amount: 150000, note: 'Konsumsi rapat (koreksi pencatatan ganda)',
+    }),
+    mk('al1', 12 * 1440, 'Hendra Kusuma', 'create', {
+      date: addDays(today, -12), type: 'pemasukan', category: 'Sponsor', amount: 2000000, note: 'Sponsor lokal untuk event internal',
+    }),
+  ]
+}
+
 export function createSeedDatabase(): Database {
   return {
     version: DB_VERSION,
@@ -449,6 +484,7 @@ export function createSeedDatabase(): Database {
     coaches,
     registrations,
     transactions: transactions(),
+    auditLogs: auditLogs(),
     sync: {
       status: 'success',
       lastSyncAt: isoMinutesAgo(240),
@@ -500,6 +536,7 @@ export function refreshDemoDates(db: Database): Database {
   }))
   db.announcements = db.announcements.map((a) => ({ ...a, publishedAt: shiftStamp(a.publishedAt) }))
   db.registrations = db.registrations.map((r) => ({ ...r, submittedAt: shiftStamp(r.submittedAt) }))
+  db.auditLogs = (db.auditLogs ?? []).map((l) => ({ ...l, at: shiftStamp(l.at) }))
   db.sync = {
     ...db.sync,
     lastSyncAt: db.sync.lastSyncAt ? shiftStamp(db.sync.lastSyncAt) : null,

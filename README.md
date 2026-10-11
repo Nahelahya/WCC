@@ -115,6 +115,7 @@ Mengembalikan data ke kondisi awal:
 | `/app/kas` | — | — | Kas & Treasury (CRUD transaksi) |
 | `/app/laporan` | — | — | Laporan kas + ekspor CSV/PDF |
 | `/app/sinkronisasi` | — | — | Status & log sinkronisasi spreadsheet |
+| `/app/audit` | — | — | **Jejak audit** transaksi kas (tambah/ubah/hapus + pelaku & waktu) |
 | `/app/profil` | Profil, ganti password, riwayat | idem | Pengaturan/Profil |
 
 Halaman yang dibuka tanpa kewenangan menampilkan **“Akses ditolak”**. Ini hanya lapisan UX —
@@ -217,6 +218,7 @@ disimpan pada `localStorage` (mode mock dulu memakai `wcc.token`; kini tidak lag
 | `GET` | `/transactions/summary?from=…&to=…` | `treasuryApi.summary()` |
 | `POST`/`PATCH` | `/transactions[/:id]` | `treasuryApi.save()` |
 | `DELETE` | `/transactions/:id` | `treasuryApi.remove()` |
+| `GET` | `/api/audit-logs?action=…&entity=…` | `auditApi.list()` — jejak audit kas (khusus pengurus) |
 | `GET` | `/api/sync/status` | `syncApi.get()` — plus `configured`, `reason`, `tab`, `columns` |
 | `POST` | `/api/sync/run` | `syncApi.run()` — sinkron nyata; **200** sukses, **503** belum dikonfigurasi, **502** bila Google gagal |
 | `POST` | `/api/uploads` | (belum dipakai) unggah bukti transaksi & foto coach |

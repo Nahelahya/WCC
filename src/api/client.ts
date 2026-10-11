@@ -26,6 +26,7 @@ export const coachApi = impl.coachApi
 export const registrationApi = impl.registrationApi
 export const treasuryApi = impl.treasuryApi
 export const syncApi = impl.syncApi
+export const auditApi = impl.auditApi
 export const statsApi = impl.statsApi
 
 // Password akun demo yang dipakai halaman masuk (sama untuk mock & API).

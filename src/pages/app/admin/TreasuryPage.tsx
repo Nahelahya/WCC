@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { treasuryApi, syncApi, type TreasurySummary } from '@/api/client'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
@@ -47,6 +48,7 @@ function periodDefaults() {
 export function TreasuryPage() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const navigate = useNavigate()
   // Hanya pengurus yang boleh mencatat/mengubah kas. Anggota hanya melihat.
   const isManager = user!.role === 'pengurus'
   const [period, setPeriod] = useState(periodDefaults())
@@ -213,9 +215,14 @@ export function TreasuryPage() {
         }
         action={
           isManager ? (
-            <Button icon="plus" onClick={openCreate}>
-              Catat Transaksi
-            </Button>
+            <>
+              <Button variant="secondary" icon="shield" onClick={() => navigate('/app/audit')}>
+                Jejak Audit
+              </Button>
+              <Button icon="plus" onClick={openCreate}>
+                Catat Transaksi
+              </Button>
+            </>
           ) : undefined
         }
       />

@@ -1,6 +1,7 @@
 import type {
   Announcement,
   Attendance,
+  AuditLogEntry,
   Coach,
   Database,
   Registration,
@@ -39,6 +40,33 @@ function fail(message: string, status = 400): Promise<never> {
 
 function uid(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
+}
+
+/** Ringkasan satu transaksi untuk muatan jejak audit. */
+function snapTx(t: Transaction) {
+  return { date: t.date, type: t.type, category: t.category, amount: t.amount, note: t.note }
+}
+
+/** Mencatat jejak audit pada database demo (padanan `writeAudit` di server). */
+function recordAudit(
+  db: Database,
+  params: {
+    userName: string
+    action: AuditLogEntry['action']
+    entityId: string
+    detail: Record<string, unknown>
+  },
+): void {
+  db.auditLogs = db.auditLogs ?? []
+  db.auditLogs.unshift({
+    id: uid('al'),
+    at: new Date().toISOString(),
+    userName: params.userName,
+    action: params.action,
+    entity: 'transaction',
+    entityId: params.entityId,
+    detail: params.detail,
+  })
 }
 
 function read(): Database {
@@ -440,7 +468,14 @@ export const treasuryApi = {
         if (input.id) {
           const found = db.transactions.find((t) => t.id === input.id)
           if (!found) throw new Error('Transaksi tidak ditemukan.')
+          const before = snapTx(found)
           Object.assign(found, input)
+          recordAudit(db, {
+            userName: found.recordedBy,
+            action: 'update',
+            entityId: found.id,
+            detail: { before, after: snapTx(found) },
+          })
           return found
         }
         const created: Transaction = {
@@ -455,6 +490,12 @@ export const treasuryApi = {
           createdAt: new Date().toISOString(),
         }
         db.transactions.push(created)
+        recordAudit(db, {
+          userName: created.recordedBy,
+          action: 'create',
+          entityId: created.id,
+          detail: snapTx(created),
+        })
         return created
       }),
     )
@@ -462,9 +503,33 @@ export const treasuryApi = {
   async remove(id: string): Promise<void> {
     return delay(
       mutate((db) => {
+        const found = db.transactions.find((t) => t.id === id)
         db.transactions = db.transactions.filter((t) => t.id !== id)
+        if (found) {
+          recordAudit(db, {
+            userName: found.recordedBy,
+            action: 'delete',
+            entityId: id,
+            detail: snapTx(found),
+          })
+        }
       }),
     )
+  },
+}
+
+/* ------------------------------------------------------------------ */
+/* Jejak audit transaksi kas                                           */
+/* ------------------------------------------------------------------ */
+
+export const auditApi = {
+  async list(filter?: { action?: string; entity?: string }): Promise<AuditLogEntry[]> {
+    const db = read()
+    let rows = [...(db.auditLogs ?? [])]
+    if (filter?.action) rows = rows.filter((r) => r.action === filter.action)
+    if (filter?.entity) rows = rows.filter((r) => r.entity === filter.entity)
+    rows.sort((a, b) => b.at.localeCompare(a.at))
+    return delay(rows)
   },
 }
 
