@@ -1,143 +1,79 @@
 # Deploy ke Hostinger — WISANGGENI CLIMBING CLUB
 
-Panduan ini untuk hosting **Hostinger Business (Node.js)** dengan metode
-**build lokal → upload → jalankan Node.js app**.
+Panduan ini menggunakan **Hostinger Web Apps / Deployments (GitHub)** dengan
+alur **push ke GitHub → build otomatis di server → jalankan Node.js (Express)**.
+Tidak perlu build/upload manual.
 
-Arsitektur:
+- Domain contoh: `navajowhite-stingray-927086.hostingersite.com`
+- Repo: `https://github.com/Nahelahya/WCC` (branch `main`)
+- Node.js: 22
 
-```
-Hostinger domain
-   └── Node.js app (entry: server.js)
-          ├── server/src  → backend Express (TypeScript, dijalankan via tsx)
-          └── dist/       → frontend React hasil build (dilayani Express, SPA fallback)
-```
-
-Frontend dan API berada pada **satu origin** (`/api/...`), jadi tidak ada masalah CORS.
-
----
-
-## 0. Ringkasan masalah lama
-
-| Gejala | Penyebab |
-|---|---|
-| `/api/*` → 404 HTML | Node.js app tidak berjalan. hPanel hanya melayani file statis. |
-| `/masuk` → 404 | Express tidak melayani frontend/SPA fallback. |
-| Backend tidak start walau dijalankan | `server.js` butuh `tsx` + `server/src`, tetapi dependency server ada di `server/package.json` (tidak di-install Hostinger). |
-
-Semua sudah diperbaiki di repo ini:
-
-- `server.js` memuat `server/src/index.ts` lewat `tsx`.
-- `server/src/app.ts` melayani `dist/` + SPA fallback (`/masuk` dsb).
-- Semua dependency server dipindah ke **root `package.json`** supaya di-install Hostinger.
-
----
-
-## 1. Siapkan paket deploy (di komputer lokal)
+Arsitektur (satu origin, jadi bebas CORS):
 
 ```
-npm install
-npm run build:web          # menghasilkan folder dist/
-```
-
-Paket siap-upload ada di **`D:\WCC-Hostinger-NodeJS.zip`** (dibuat dari `D:\WCC-deploy`).
-
-Isi paket:
-
-```
-dist/                  # frontend hasil build
-server.js              # entry point
-package.json           # dependency (express, pg, tsx, dll)
-package-lock.json
-server/
-  src/                 # source backend (TypeScript)
-  package.json
-  tsconfig.json
-```
-
-> Jangan upload `node_modules`, `.env`, atau folder `uploads` dari lokal.
-
----
-
-## 2. Upload ke Hostinger
-
-1. hPanel → **Files → File Manager** → masuk ke `public_html`.
-2. Hapus file lama (kecuali Anda tahu isinya), lalu **Upload** file `WCC-Hostinger-NodeJS.zip`.
-3. Klik kanan ZIP → **Extract** ke `public_html`.
-4. Pastikan struktur akhir:
-
-```
-public_html/
-  dist/
-  server/
-    src/
-  server.js
-  package.json
+Domain (HTTPS)
+   └── Node.js app (Express, Passenger/LiteSpeed)
+          ├── dist/               → frontend React hasil build (dibuat di server via `vite build`)
+          └── server/src/**       → backend Express (TypeScript, dijalankan via tsx/cjs)
+   Frontend memanggil API lewat path relatif: /api/...
 ```
 
 ---
 
-## 3. Aktifkan Node.js Application
+## 1. Setelan Deployment di hPanel
 
-hPanel → **Advanced → Node.js** (atau **Website → Node.js**).
-
-### Bila belum ada aplikasi → **Create Application**
+hPanel → **Websites → kelola domain → Deployments / Web Apps → Settings**.
 
 | Field | Nilai |
 |---|---|
-| Domain | `navajowhite-stingray-927086.hostingersite.com` |
-| Application root | `public_html` |
-| Application startup file | `server.js` |
-| Application type | **express** (bukan static/vite) |
-| Output directory | **kosongkan** |
-| Node.js version | **22** (minimal 20) |
+| Framework / Application type | **Express** |
+| Root directory | *(kosongkan)* |
+| Build command / Build script | `build` |
+| **Output directory** | *(kosongkan — penting untuk Express)* |
+| **Entry file** | **`server.cjs`** |
+| Package manager | `npm` |
+| Node.js version | `22` |
+| Repository | `Nahelahya/WCC` |
+| Branch | `main` |
 
-Klik **Create**.
+> ⚠️ Jangan biarkan tipe aplikasi terdeteksi sebagai **vite/static** dan jangan
+> isi Output directory dengan `dist`. Kalau diisi `dist`, Node/Express tidak akan
+> pernah dijalankan (hanya file statis yang dilayani).
 
-> ⚠️ **Penting:** Jika Hostinger salah mendeteksi sebagai *vite/static*,
-> pilih manual **Application type = express** dan **Entry file = server.js**.
-> Kalau tidak, backend tidak akan pernah dijalankan.
-
-### Bila sudah ada aplikasi
-
-1. Buka aplikasinya, klik **Stop** dulu bila status Running/Error.
-2. Pastikan konfigurasi sama seperti tabel di atas.
-3. Klik **Run / Start**.
+Setelah disimpan, klik **Deploy / Save and redeploy**.
 
 ---
 
-## 4. Install dependency di server
+## 2. Environment Variables
 
-Buka **Advanced → Terminal** (atau SSH) lalu:
-
-```bash
-cd ~/public_html
-npm install --omit=dev
-```
-
-Ini memasang `express`, `pg`, `tsx`, `cors`, dll dari `package.json`.
-
-> Gunakan `--omit=dev` karena `vite`/`typescript` tidak dibutuhkan di server
-> (frontend sudah di-build). `tsx` **wajib** ada karena menjalankan TypeScript backend.
-
----
-
-## 5. Atur Environment Variables
-
-hPanel → Node.js → **Environment Variables** (atau buat file `public_html/.env`).
+hPanel → Deployments → **Environment Variables**. (Bisa juga lewat API
+`PUT /api/hosting/v1/accounts/{username}/websites/{domain}/nodejs/builds/settings/env`.)
 
 ### Wajib
 
 | Variable | Nilai |
 |---|---|
 | `NODE_ENV` | `production` |
-| `JWT_SECRET` | string acak panjang (lihat catatan di bawah) |
 | `DATABASE_URL` | connection string PostgreSQL (Supabase) |
-| `CORS_ORIGIN` | `https://navajowhite-stingray-927086.hostingersite.com` |
-| `PUBLIC_APP_URL` | `https://navajowhite-stingray-927086.hostingersite.com` |
+| `JWT_SECRET` | string acak panjang |
+| `CORS_ORIGIN` | `https://<domain>` |
+| `PUBLIC_APP_URL` | `https://<domain>` |
 | `COOKIE_SECURE` | `true` |
 
-> **JANGAN set `PORT`.** Hostinger menyediakan port secara otomatis lewat
-> `process.env.PORT`. App sudah membaca nilai itu.
+### Frontend (dipakai saat `vite build`)
+
+| Variable | Nilai |
+|---|---|
+| `VITE_API_MODE` | `live` |
+| `VITE_API_URL` | `/api` |
+
+### Penyimpanan berkas unggahan (disarankan persisten)
+
+Letakkan **di luar** `hbuilds/` agar tidak hilang setiap deploy:
+
+| Variable | Nilai |
+|---|---|
+| `UPLOAD_DIR` | `/home/<user>/wcc-uploads` |
 
 ### Opsional (email)
 
@@ -146,47 +82,76 @@ hPanel → Node.js → **Environment Variables** (atau buat file `public_html/.e
 | `SMTP_HOST` | mis. `smtp.gmail.com` |
 | `SMTP_PORT` | `587` |
 | `SMTP_USER` | alamat Gmail |
-| `SMTP_PASS` | app password Gmail (16 karakter) |
+| `SMTP_PASS` | app password Gmail |
 | `SMTP_SECURE` | `false` |
 | `MAIL_FROM` | `WISANGGENI CLIMBING CLUB <no-reply@wcc.id>` |
 
 Jika `SMTP_HOST` kosong, email hanya ditulis ke log server (tidak terkirim).
 
-### Database
+> **JANGAN set `PORT`.** Hostinger/Passenger menyediakan port otomatis lewat
+> `process.env.PORT`; app sudah membacanya.
 
-Gunakan `DATABASE_URL` PostgreSQL Supabase yang sudah ada, contoh:
-
-```
-postgresql://postgres.iiwujuwliqlwgdhdtayw:PASSWORD@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
-```
-
-Set `COOKIE_SECURE=true` hanya bila domain memakai **HTTPS** (Hostinger
-menyediakan SSL gratis — aktifkan di hPanel → SSL).
+> **Catatan `DATABASE_URL`:** bila password memuat karakter khusus (mis. `#`,
+> `/`, `?`), app akan meng-encode bagian password secara otomatis (lihat
+> `server/src/db/connectionString.ts`), jadi URL boleh ditulis apa adanya.
 
 ---
 
-## 6. Jalankan & verifikasi
+## 3. Cara entry point bekerja
 
-1. Node.js → klik **Run / Restart**.
-2. Buka **Logs** bila ada error.
-3. Uji dari browser:
+Passenger/LiteSpeed memuat entry file dengan `require()`. Karena itu:
+
+- Entry adalah **`server.cjs`** (CommonJS), **bukan** ESM dan **tanpa**
+  top-level `await` — kalau tidak, muncul `ERR_REQUIRE_ASYNC_MODULE`.
+- `server.cjs` memakai hook `tsx/cjs` untuk menjalankan `server/src/index.ts`
+  (TypeScript langsung, tanpa langkah build backend terpisah).
+- `server/src/app.ts` melayani `dist/` + SPA fallback untuk semua rute
+  non-`/api` dan non-`/uploads` (mis. `/masuk`, `/kebijakan-privasi`).
+
+Semua dependency backend ada di **root `package.json`** supaya di-install
+Hostinger. Build tools frontend (`vite`, `typescript`, `tailwindcss`, dll) juga
+ditaruh di `dependencies` karena build frontend dijalankan di server dengan
+`NODE_ENV=production` (yang biasanya melewati `devDependencies`).
+
+---
+
+## 4. Alur update berikutnya
+
+Karena **auto-deploy** GitHub sudah aktif, cukup:
+
+```bash
+git add -A
+git commit -m "perubahan ..."
+git push origin main
+```
+
+Hostinger akan otomatis: `npm install` → `npm run build` (`vite build`) →
+restart aplikasi. Pantau di **Deployments → Logs** atau lewat API:
+
+```
+GET  /api/hosting/v1/accounts/{username}/websites/{domain}/nodejs/builds
+POST /api/hosting/v1/accounts/{username}/websites/{domain}/nodejs/builds   # trigger build manual
+GET  .../nodejs/builds/{uuid}/logs
+POST .../nodejs/server/restart
+```
+
+> Jangan mengedit isi `hbuilds/` atau `public_html/` secara manual — akan
+> ditimpa setiap deploy.
+
+---
+
+## 5. Verifikasi
 
 | URL | Hasil yang benar |
 |---|---|
 | `https://<domain>/api/health` | `{"ok":true,"service":"wcc-server",...}` (JSON) |
-| `https://<domain>/masuk` | Halaman login (HTML, bukan 404) |
+| `https://<domain>/masuk` | Halaman login (HTML 200) |
 | `https://<domain>/` | Landing page |
-
-Jika `/api/health` masih 404 HTML → Node.js app belum jalan (ulangi langkah 3).
-Jika muncul JSON error tapi bukan `ok` → cek **Logs** untuk pesan error
-(mis. `Cannot find module 'express'` → langkah 4 belum dijalankan,
-`DATABASE_URL ...` → env database salah).
+| `https://<domain>/kebijakan-privasi` | Halaman kebijakan privasi (HTML 200) |
 
 ---
 
-## 7. Login
-
-Akun admin (ubah password setelah login pertama):
+## 6. Login
 
 ```
 Email    : nahelahya4@gmail.com
@@ -194,37 +159,19 @@ Password : wcc12345
 ```
 
 Akun demo (`anggota@wcc.id`, `coach@wcc.id`, `pengurus@wcc.id`) sudah
-**dihapus dari halaman login**. Bila tabel pengguna masih berisi akun demo
-dan ingin dibersihkan, jalankan skrip seed produksi dari Terminal:
-
-```bash
-cd ~/public_html/server
-npx tsx src/db/seed-production.ts
-```
+**dihapus dari halaman login**.
 
 ---
 
-## 8. Alur update berikutnya
-
-```bash
-# Di komputer lokal
-npm run build:web
-# lalu upload ulang dist/ (atau zip baru) ke public_html
-```
-
-Jika ada perubahan kode backend (`server/src`), upload ulang folder `server/src`
-lalu klik **Restart** pada Node.js app.
-
----
-
-## 9. Troubleshooting cepat
+## 7. Troubleshooting cepat
 
 | Masalah | Solusi |
 |---|---|
-| `/api/*` → 404 HTML | Node.js app belum dibuat/dijalankan, atau entry file bukan `server.js`. |
-| `Cannot find module 'express'` | Belum `npm install --omit=dev` di `public_html`. |
-| `Cannot find module 'tsx'` | `tsx` tidak ada di `dependencies` / install gagal. |
+| Semua rute → **503 Service Unavailable** | Aplikasi crash saat start. Baca `hbuilds/current/nodejs/stderr.log` / `console.log`. |
+| `ERR_REQUIRE_ASYNC_MODULE` | Entry harus CommonJS (`server.cjs`), bukan ESM dengan top-level `await`. |
+| `/api/*` → 404 HTML, `/` menampilkan statis lama | Application type masih **vite/static**. Set ke **Express**, Output directory **kosong**. |
+| `TypeError: Invalid URL` (pg) | Password `DATABASE_URL` memuat karakter khusus — pastikan `connectionString.ts` dipakai (sudah otomatis). |
 | `JWT_SECRET wajib diisi` | Set env `JWT_SECRET`. |
-| Error koneksi database | Cek `DATABASE_URL` (host, port 6543, password). |
-| Login berhasil tapi langsung logout | `COOKIE_SECURE=true` tapi situs belum HTTPS, atau `CORS_ORIGIN` salah. |
-| Gambar/font tidak muncul | Cek `public_html/dist/assets` sudah ter-upload lengkap. |
+| Upload hilang setelah deploy | Set `UPLOAD_DIR` ke folder di luar `hbuilds/` (mis. `/home/<user>/wcc-uploads`). |
+| Login sukses tapi langsung logout | `COOKIE_SECURE=true` tapi situs belum HTTPS, atau `CORS_ORIGIN` salah. |
+| Gambar tampak "berubah" setelah diunggah | Optimasi gambar otomatis oleh CDN Hostinger (hcdn) — normal, gambar tetap valid. |
