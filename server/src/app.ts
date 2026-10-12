@@ -32,15 +32,21 @@ export function createApp() {
   // Keamanan dasar: header HTTP
   app.use(helmet())
 
-  // Pembatasan laju permintaan umum
-  const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 100,
-    standardHeaders: 'draft-7',
-    legacyHeaders: false,
-    message: { message: 'Terlalu banyak permintaan. Silakan coba lagi beberapa menit lagi.' },
-  })
-  app.use('/api', globalLimiter)
+  // Pembatasan laju permintaan umum. Nonaktif secara default (API_RATE_LIMIT=0)
+  // supaya pemakaian normal tidak pernah kena blokir sementara. Isi
+  // API_RATE_LIMIT > 0 di .env bila ingin mengaktifkannya kembali.
+  if (env.apiRateLimit > 0) {
+    app.use(
+      '/api',
+      rateLimit({
+        windowMs: env.rateLimitWindowMinutes * 60 * 1000,
+        limit: env.apiRateLimit,
+        standardHeaders: 'draft-7',
+        legacyHeaders: false,
+        message: { message: 'Terlalu banyak permintaan. Silakan coba lagi beberapa menit lagi.' },
+      }),
+    )
+  }
 
   app.use(express.json({ limit: '1mb' }))
   app.use(cookieParser())

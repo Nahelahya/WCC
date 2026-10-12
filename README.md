@@ -161,15 +161,17 @@ relasional yang dipakai (lihat skema di `server/src/db/migrations/001_init.sql`)
 | `GET` | `/api/auth/me` | `authApi.me()` |
 | `POST` | `/api/auth/refresh` | (otomatis oleh klien) rotasi refresh token |
 | `POST` | `/api/auth/logout` | `authApi.logout()` — cabut refresh token |
-| `POST` | `/api/auth/forgot-password` | `authApi.requestPasswordReset(email)` — kirim tautan reset (rate limit 5/15 menit) |
+| `POST` | `/api/auth/forgot-password` | `authApi.requestPasswordReset(email)` — kirim tautan reset (rate limit opsional, lihat `.env`) |
 | `GET` | `/api/auth/reset-password?token=…` | `authApi.verifyResetToken(token)` — cek tautan masih berlaku |
 | `POST` | `/api/auth/reset-password` | `authApi.resetPassword(token, password)` — set password baru, cabut sesi lama |
 | `GET` | `/api/health` | cek status server |
 
 **Autentikasi**: access token JWT berumur pendek pada cookie `wcc_at` (HttpOnly, SameSite=Lax) +
 refresh token opaque pada cookie `wcc_rt` (path `/api/auth`) dengan **rotasi** saat dipakai ulang.
-Password di-hash dengan bcrypt. Login dibatasi 10 percobaan / 15 menit per IP. Token **tidak pernah**
-disimpan pada `localStorage` (mode mock dulu memakai `wcc.token`; kini tidak lagi).
+Password di-hash dengan bcrypt. Secara bawaan **tidak ada blokir sementara** ("Terlalu banyak
+permintaan") agar pemakaian normal tidak terganggu; pembatasan laju dapat diaktifkan kembali lewat
+variabel `API_RATE_LIMIT`, `LOGIN_RATE_LIMIT`, dan `PASSWORD_RESET_RATE_LIMIT` di `.env`
+(lihat `server/.env.example`). Token **tidak pernah** disimpan pada `localStorage`.
 
 ### Pengguna & profil
 | Method | Endpoint | Fungsi |
@@ -240,7 +242,7 @@ Struktur kolom spreadsheet: `Tanggal | Tipe | Kategori | Nominal | Keterangan | 
 ### Wajib untuk produksi
 1. ✅ **Backend REST API + database relasional** — selesai (Express + PostgreSQL di `server/`).
 2. ✅ **Autentikasi & otorisasi server** — selesai (JWT + cookie HttpOnly, bcrypt, RBAC, refresh
-   token dengan rotasi, rate limit login).
+   token dengan rotasi, pembatasan laju opsional lewat env).
 3. ⏳ **Kredensial Google Sheets** — kode & integrasi **selesai** (lihat **bagian 9**). Yang tinggal
    diminta dari Anda: **berkas Service Account JSON** + **ID spreadsheet**, lalu **bagikan** spreadsheet
    ke email service account sebagai Editor. Sinkronisasi otomatis terjadwal dapat diaktifkan lewat

@@ -1,6 +1,7 @@
-import { Router, type Request, type Response } from 'express'
+import { Router, type Request, type RequestHandler, type Response } from 'express'
 import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
+import { env } from '../env'
 import { query } from '../db/pool'
 import { ApiError } from '../lib/errors'
 import { wrap } from '../lib/async'
@@ -20,23 +21,33 @@ import {
   setRefreshCookie,
 } from '../middleware/auth'
 
+/**
+ * Membuat middleware pembatas laju. Bila `limit` <= 0 (default di .env),
+ * pembatasan dimatikan sehingga tidak ada blokir sementara untuk pemakaian
+ * normal. Isi nilainya > 0 di .env untuk mengaktifkan kembali.
+ */
+function maybeRateLimit(limit: number, message: string): RequestHandler {
+  if (!(limit > 0)) return (_req, _res, next) => next()
+  return rateLimit({
+    windowMs: env.rateLimitWindowMinutes * 60 * 1000,
+    limit,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { message },
+  })
+}
+
 // Membatasi percobaan login untuk mencegah brute force.
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  message: { message: 'Terlalu banyak percobaan masuk. Silakan coba lagi beberapa menit lagi.' },
-})
+const loginLimiter = maybeRateLimit(
+  env.loginRateLimit,
+  'Terlalu banyak percobaan masuk. Silakan coba lagi beberapa menit lagi.',
+)
 
 // Membatasi permintaan tautan reset agar tidak disalahgunakan untuk spam email.
-const forgotLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 5,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  message: { message: 'Terlalu banyak permintaan pemulihan. Silakan coba lagi beberapa menit lagi.' },
-})
+const forgotLimiter = maybeRateLimit(
+  env.passwordResetRateLimit,
+  'Terlalu banyak permintaan pemulihan. Silakan coba lagi beberapa menit lagi.',
+)
 
 /** Masa berlaku OTP pemulihan password. */
 const OTP_TTL_MINUTES = 5

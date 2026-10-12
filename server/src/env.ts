@@ -37,6 +37,14 @@ export const env = {
   uploadDir: process.env.UPLOAD_DIR ?? 'uploads',
   uploadMaxMb: Number(process.env.UPLOAD_MAX_MB ?? 5),
 
+  // ---- Pembatasan laju permintaan (rate limit) ----
+  // 0 = NONAKTIF: tanpa blokir sementara (tidak ada pesan "Terlalu banyak
+  // permintaan"). Isi angka > 0 untuk mengaktifkan kembali pembatasannya.
+  rateLimitWindowMinutes: Number(process.env.RATE_LIMIT_WINDOW_MINUTES ?? 15),
+  apiRateLimit: Number(process.env.API_RATE_LIMIT ?? 0),
+  loginRateLimit: Number(process.env.LOGIN_RATE_LIMIT ?? 0),
+  passwordResetRateLimit: Number(process.env.PASSWORD_RESET_RATE_LIMIT ?? 0),
+
   // ---- Google Sheets (poin 3) ----
   googleSheetsId: process.env.GOOGLE_SHEETS_ID ?? '',
   googleSheetsTab: process.env.GOOGLE_SHEETS_TAB ?? 'Kas',
