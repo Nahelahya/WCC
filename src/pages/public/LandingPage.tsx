@@ -66,7 +66,7 @@ export function LandingPage() {
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-primary text-white">
+      <section className="relative overflow-hidden bg-brand text-white">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 opacity-[0.14]"
@@ -283,7 +283,7 @@ export function LandingPage() {
           <ol className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {content.steps.items.map((s, i) => (
               <li key={s.title} className="card p-4">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
                   {i + 1}
                 </span>
                 <h3 className="mt-3 text-[15.5px] font-semibold text-ink">{s.title}</h3>
@@ -342,7 +342,7 @@ export function LandingPage() {
 
       {/* CTA */}
       <section className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6">
-        <div className="overflow-hidden rounded-card bg-primary px-6 py-10 text-center text-white sm:px-12 sm:py-14">
+        <div className="overflow-hidden rounded-card bg-brand px-6 py-10 text-center text-white sm:px-12 sm:py-14">
           <h2 className="text-[26px] font-bold leading-tight sm:text-[32px]">{content.cta.title}</h2>
           {content.cta.description && (
             <p className="mx-auto mt-3 max-w-xl text-sm text-white/80">{content.cta.description}</p>

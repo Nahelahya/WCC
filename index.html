@@ -16,6 +16,23 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <script>
+      // Terapkan tema sebelum React dimuat agar tidak ada kedipan (flash) saat
+      // halaman pertama dibuka. Pilihan tersimpan di localStorage "wcc-theme".
+      (function () {
+        try {
+          var stored = localStorage.getItem('wcc-theme')
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+          document.documentElement.classList.toggle('dark', theme === 'dark')
+          document.documentElement.style.colorScheme = theme
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

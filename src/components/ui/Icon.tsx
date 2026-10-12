@@ -46,6 +46,8 @@ export type IconName =
   | 'save'
   | 'undo'
   | 'chevron-up'
+  | 'sun'
+  | 'moon'
 
 const PATHS: Record<IconName, string> = {
   home: 'M3 10.5 12 3l9 7.5M5.5 9.5V20h13V9.5',
@@ -93,6 +95,8 @@ const PATHS: Record<IconName, string> = {
   settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 14.5a7.9 7.9 0 0 0 0-5l1.7-1.3-1.9-3.3-2 .8a7.8 7.8 0 0 0-4.3-2.5L12.5 1h-3.8L8.3 3.2A7.8 7.8 0 0 0 4 5.7l-2-.8L.1 8.2l1.7 1.3a7.9 7.9 0 0 0 0 5L.1 15.8l1.9 3.3 2-.8a7.8 7.8 0 0 0 4.3 2.5l.4 2.2h3.8l.4-2.2a7.8 7.8 0 0 0 4.3-2.5l2 .8 1.9-3.3-1.7-1.3z',
   list: 'M8 6.5h12M8 12h12M8 17.5h12M4 6.5h.01M4 12h.01M4 17.5h.01',
   inbox: 'M3.5 13.5 6 5.5h12l2.5 8v5.5h-17zM3.5 13.5H9a3 3 0 0 0 6 0h5.5',
+  sun: 'M12 16.5a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zM12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4',
+  moon: 'M20.6 14.4A8.6 8.6 0 0 1 9.6 3.4a8.6 8.6 0 1 0 11 11z',
 }
 
 interface IconProps extends SVGProps<SVGSVGElement> {

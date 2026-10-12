@@ -8,7 +8,7 @@ const ICON_TONES: Record<StatTone, string> = {
   primary: 'bg-primary/10 text-primary',
   success: 'bg-success/10 text-success',
   danger: 'bg-danger/10 text-danger',
-  accent: 'bg-accent/15 text-[#8a4a04]',
+  accent: 'bg-accent/15 text-accent-ink',
   info: 'bg-info/10 text-info',
   neutral: 'bg-bg text-muted',
   warning: 'bg-warning/10 text-warning',

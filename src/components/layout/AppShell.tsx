@@ -7,6 +7,7 @@ import { Logo } from '@/components/ui/Logo'
 import { MobileBottomNav, SidebarNavigation, Avatar } from './SidebarNavigation'
 import { ROLE_LABEL, canAccess } from './nav'
 import { Icon } from '@/components/ui/Icon'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 export function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading } = useAuth()
@@ -47,7 +48,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
     <div className="min-h-screen bg-bg">
       <a
         href="#konten-utama"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-control focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-control focus:bg-brand focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
       >
         Lompat ke konten utama
       </a>
@@ -72,6 +73,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
             </span>
           </Link>
           <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <Link
               to="/app/profil"
               className="flex items-center gap-2 rounded-full border border-line py-1 pl-2.5 pr-1"

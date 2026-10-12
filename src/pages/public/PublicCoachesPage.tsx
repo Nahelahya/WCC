@@ -102,7 +102,7 @@ export function HowToJoinPage() {
       <ol className="space-y-3">
         {STEPS.map((s, i) => (
           <li key={s.title} className="card flex gap-4 p-4">
-            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-brand text-sm font-bold text-white">
               {i + 1}
             </span>
             <div>

@@ -26,7 +26,7 @@ const TONE_BG: Record<StatusTone, string> = {
   danger: 'bg-danger/10 text-danger',
   info: 'bg-info/10 text-info',
   neutral: 'bg-bg text-muted',
-  accent: 'bg-accent/15 text-[#8a4a04]',
+  accent: 'bg-accent/15 text-accent-ink',
   primary: 'bg-primary/10 text-primary',
 }
 
@@ -140,7 +140,7 @@ export function AuditLogPage() {
               onClick={() => setFilter(f.value)}
               className={`rounded-control border px-3 py-1.5 text-[13px] font-medium transition-colors ${
                 active
-                  ? 'border-primary bg-primary text-white'
+                  ? 'border-brand bg-brand text-white'
                   : 'border-line bg-surface text-muted hover:border-primary/40 hover:text-ink'
               }`}
             >

@@ -161,7 +161,7 @@ export function SchedulePage() {
                 onClick={() => setScope(value)}
                 aria-pressed={scope === value}
                 className={`min-h-[38px] rounded-[7px] px-3.5 text-[13px] font-semibold transition-colors ${
-                  scope === value ? 'bg-primary text-white' : 'text-muted hover:bg-bg'
+                  scope === value ? 'bg-brand text-white' : 'text-muted hover:bg-bg'
                 }`}
               >
                 {label}

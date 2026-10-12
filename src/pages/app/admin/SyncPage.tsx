@@ -117,7 +117,7 @@ export function SyncPage() {
               key={c}
               className="flex items-center gap-2 rounded-control border border-line bg-bg/60 px-3 py-2 text-[13px] font-medium text-ink"
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white">
                 {i + 1}
               </span>
               {c}

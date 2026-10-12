@@ -55,7 +55,7 @@ export function LoginPage() {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* Panel visual */}
-      <div className="relative hidden overflow-hidden bg-primary p-10 text-white lg:flex lg:flex-col">
+      <div className="relative hidden overflow-hidden bg-brand p-10 text-white lg:flex lg:flex-col">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 opacity-[0.16]"

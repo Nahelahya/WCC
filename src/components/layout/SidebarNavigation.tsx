@@ -4,6 +4,7 @@ import { cn } from '@/lib/session'
 import { Icon } from '@/components/ui/Icon'
 import { Logo } from '@/components/ui/Logo'
 import { Button } from '@/components/ui/Button'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { ROLE_LABEL, mobileNavFor, navFor, overflowNavFor } from './nav'
 import type { User } from '@/types'
 import { useAuth } from '@/context/AuthContext'
@@ -32,7 +33,7 @@ export function Avatar({ user, size = 38 }: { user: User; size?: number }) {
     <span
       aria-hidden="true"
       style={{ height: size, width: size, fontSize: size * 0.38 }}
-      className="flex flex-none items-center justify-center rounded-full bg-primary text-[13px] font-bold text-white ring-2 ring-primary/20"
+      className="flex flex-none items-center justify-center rounded-full bg-brand text-[13px] font-bold text-white ring-2 ring-brand/20"
     >
       {initials(user.name)}
     </span>
@@ -72,7 +73,7 @@ export function SidebarNavigation({ user }: { user: User }) {
                   cn(
                     'flex min-h-[44px] items-center gap-3 rounded-control px-3 py-2.5 text-sm font-medium transition-colors duration-ui',
                     isActive
-                      ? 'bg-primary text-white'
+                      ? 'bg-brand text-white'
                       : 'text-ink/80 hover:bg-primary/10 hover:text-primary',
                   )
                 }
@@ -90,6 +91,7 @@ export function SidebarNavigation({ user }: { user: User }) {
       </nav>
 
       <div className="border-t border-line p-3">
+        <ThemeToggle withLabel block className="mb-2" />
         <Button
           variant="secondary"
           icon="logout"
@@ -165,7 +167,7 @@ export function MobileBottomNav({ user }: { user: User }) {
 
       {drawerOpen && (
         <div className="fixed inset-0 z-[60] lg:hidden">
-          <div className="absolute inset-0 bg-ink/45 backdrop-blur-[2px]" onClick={() => setDrawerOpen(false)} aria-hidden="true" />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={() => setDrawerOpen(false)} aria-hidden="true" />
           <div
             role="dialog"
             aria-label="Menu lainnya"

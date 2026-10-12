@@ -9,7 +9,7 @@ const TONES: Record<StatusTone, string> = {
   danger: 'border-danger/25 bg-danger/10 text-danger',
   info: 'border-info/25 bg-info/10 text-info',
   neutral: 'border-line bg-bg text-muted',
-  accent: 'border-accent/35 bg-accent/15 text-[#8a4a04]',
+  accent: 'border-accent/35 bg-accent/15 text-accent-ink',
   primary: 'border-primary/25 bg-primary/10 text-primary',
 }
 

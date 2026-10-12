@@ -520,6 +520,14 @@ export const registrationApi = {
       mutate((db) => {
         const r = db.registrations.find((x) => x.id === id)
         if (!r) throw new Error('Pendaftaran tidak ditemukan.')
+        // Keputusan verifikasi/tolak bersifat final.
+        if ((r.status === 'diverifikasi' || r.status === 'ditolak') && status !== r.status) {
+          throw new Error(
+            r.status === 'diverifikasi'
+              ? 'Pendaftaran ini sudah diverifikasi dan keputusannya bersifat final.'
+              : 'Pendaftaran ini sudah ditolak dan keputusannya bersifat final.',
+          )
+        }
         r.status = status
         if (internalNote !== undefined) r.internalNote = internalNote
         return r

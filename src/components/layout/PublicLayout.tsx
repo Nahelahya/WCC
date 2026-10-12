@@ -4,6 +4,7 @@ import { cn } from '@/lib/session'
 import { Logo } from '@/components/ui/Logo'
 import { Icon } from '@/components/ui/Icon'
 import { buttonClasses } from '@/components/ui/Button'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { useAuth } from '@/context/AuthContext'
 import { useEffect } from 'react'
 import { landingApi } from '@/api/client'
@@ -65,6 +66,7 @@ export function PublicLayout() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             {user ? (
               <Link to="/app" className={buttonClasses('primary', 'md')}>
                 Buka Dashboard
@@ -121,7 +123,7 @@ export function PublicLayout() {
         <Outlet />
       </main>
 
-      <footer className="mt-16 border-t border-line bg-primary text-white">
+      <footer className="mt-16 border-t border-line bg-brand text-white">
         <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
           <div className="sm:col-span-2">
             <Logo size={44} variant="light" />

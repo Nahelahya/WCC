@@ -163,6 +163,20 @@ registrationRouter.patch(
     const { rows: previous } = await query<RegistrationRow>('select * from registrations where id = $1', [
       req.params.id,
     ])
+    const before = previous[0]
+    if (!before) throw ApiError.notFound('Pendaftaran tidak ditemukan.')
+
+    // Keputusan verifikasi/tolak bersifat FINAL — sekali dipilih tidak dapat
+    // diubah lagi. Ini mencegah keputusan bolak-balik dan pembuatan akun ganda.
+    const finalTerpilih = before.status === 'diverifikasi' || before.status === 'ditolak'
+    if (finalTerpilih && status !== before.status) {
+      throw ApiError.conflict(
+        before.status === 'diverifikasi'
+          ? 'Pendaftaran ini sudah diverifikasi dan keputusannya bersifat final.'
+          : 'Pendaftaran ini sudah ditolak dan keputusannya bersifat final.',
+      )
+    }
+
     const { rows } = await query<RegistrationRow>(
       `update registrations
        set status = $2, internal_note = coalesce($3, internal_note)
@@ -172,7 +186,7 @@ registrationRouter.patch(
     )
     if (!rows[0]) throw ApiError.notFound('Pendaftaran tidak ditemukan.')
 
-    const changed = previous[0]?.status !== rows[0].status
+    const changed = before.status !== rows[0].status
 
     // Saat diverifikasi: buat akun anggota otomatis memakai password yang
     // dipilih calon anggota saat mendaftar, agar bisa langsung masuk (login).

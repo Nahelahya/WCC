@@ -1,25 +1,36 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
+        // Semua warna brand memakai CSS variable (lihat src/index.css) agar bisa
+        // bertema terang/gelap. Format `rgb(<channel> / <alpha-value>)` supaya
+        // modifier opasitas Tailwind (mis. `bg-primary/10`) tetap bekerja.
         primary: {
-          DEFAULT: '#173F35',
-          hover: '#245747',
+          DEFAULT: 'rgb(var(--color-primary) / <alpha-value>)',
+          hover: 'rgb(var(--color-primary-hover) / <alpha-value>)',
+        },
+        // Warna latar brand solid (tombol, hero, sidebar aktif) yang selalu
+        // memakai teks putih — sengaja gelap di kedua tema.
+        brand: {
+          DEFAULT: 'rgb(var(--color-brand) / <alpha-value>)',
+          hover: 'rgb(var(--color-brand-hover) / <alpha-value>)',
         },
         accent: {
-          DEFAULT: '#F28C28',
+          DEFAULT: 'rgb(var(--color-accent) / <alpha-value>)',
+          ink: 'rgb(var(--color-accent-ink) / <alpha-value>)',
         },
-        bg: '#F5F6F2',
-        surface: '#FFFFFF',
-        ink: '#17211D',
-        muted: '#66736C',
-        line: '#DCE3DD',
-        success: '#238653',
-        warning: '#C27A13',
-        danger: '#C43D3D',
-        info: '#2876B8',
+        bg: 'rgb(var(--color-bg) / <alpha-value>)',
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
+        ink: 'rgb(var(--color-text) / <alpha-value>)',
+        muted: 'rgb(var(--color-muted) / <alpha-value>)',
+        line: 'rgb(var(--color-border) / <alpha-value>)',
+        success: 'rgb(var(--color-success) / <alpha-value>)',
+        warning: 'rgb(var(--color-warning) / <alpha-value>)',
+        danger: 'rgb(var(--color-danger) / <alpha-value>)',
+        info: 'rgb(var(--color-info) / <alpha-value>)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],

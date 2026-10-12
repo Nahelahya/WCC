@@ -24,6 +24,7 @@ export function RegistrationsPage() {
   const [detail, setDetail] = useState<Registration | null>(null)
   const [note, setNote] = useState('')
   const [working, setWorking] = useState(false)
+  const [pending, setPending] = useState<RegistrationStatus | null>(null)
 
   const rows = useMemo(() => {
     let data = list.data ?? []
@@ -35,8 +36,12 @@ export function RegistrationsPage() {
   const current = rows.slice((page - 1) * PER_PAGE, page * PER_PAGE)
   const all = list.data ?? []
 
+  // Keputusan verifikasi/tolak bersifat final: begitu dipilih tidak bisa diubah.
+  const locked = detail?.status === 'diverifikasi' || detail?.status === 'ditolak'
+
   async function setRegStatus(r: Registration, next: RegistrationStatus) {
     setWorking(true)
+    setPending(next)
     try {
       await registrationApi.setStatus(r.id, next, note || undefined)
       toast(
@@ -52,6 +57,7 @@ export function RegistrationsPage() {
       toast(errorMessage(err), 'error')
     } finally {
       setWorking(false)
+      setPending(null)
     }
   }
 
@@ -184,21 +190,25 @@ export function RegistrationsPage() {
               <Button variant="secondary" onClick={() => setDetail(null)} disabled={working}>
                 Tutup
               </Button>
-              <Button
-                variant="danger"
-                loading={working && detail.status !== 'diverifikasi'}
-                onClick={() => void setRegStatus(detail, 'ditolak')}
-                disabled={detail.status === 'ditolak'}
-              >
-                Tolak
-              </Button>
-              <Button
-                loading={working && detail.status !== 'ditolak'}
-                onClick={() => void setRegStatus(detail, 'diverifikasi')}
-                disabled={detail.status === 'diverifikasi'}
-              >
-                Verifikasi
-              </Button>
+              {!locked && (
+                <>
+                  <Button
+                    variant="danger"
+                    loading={working && pending === 'ditolak'}
+                    onClick={() => void setRegStatus(detail, 'ditolak')}
+                    disabled={working}
+                  >
+                    Tolak
+                  </Button>
+                  <Button
+                    loading={working && pending === 'diverifikasi'}
+                    onClick={() => void setRegStatus(detail, 'diverifikasi')}
+                    disabled={working}
+                  >
+                    Verifikasi
+                  </Button>
+                </>
+              )}
             </>
           ) : undefined
         }
@@ -242,13 +252,23 @@ export function RegistrationsPage() {
               label="Catatan internal (opsional)"
               value={note}
               onChange={(e) => setNote(e.target.value)}
+              disabled={locked}
+              helper={locked ? 'Keputusan sudah final — catatan hanya dapat dilihat.' : undefined}
               placeholder="Hanya terlihat pengurus. Tidak dikirim ke calon anggota."
             />
 
-            <Alert tone="info">
-              Perubahan status disimpan ke backend. Calon anggota dapat memeriksa status melalui halaman
-              Cek Status Pendaftaran.
-            </Alert>
+            {locked ? (
+              <Alert tone="info">
+                Pendaftaran ini sudah{' '}
+                <strong>{detail.status === 'diverifikasi' ? 'diverifikasi' : 'ditolak'}</strong>. Keputusan bersifat{' '}
+                <strong>final</strong> dan tidak dapat diubah lagi.
+              </Alert>
+            ) : (
+              <Alert tone="warning">
+                Pastikan data sudah benar. Setelah memilih <strong>Verifikasi</strong> atau <strong>Tolak</strong>,
+                keputusan <strong>tidak dapat diubah</strong> lagi.
+              </Alert>
+            )}
           </div>
         )}
       </Modal>

@@ -4,18 +4,53 @@
 
 @layer base {
   :root {
-    --color-primary: #173f35;
-    --color-primary-hover: #245747;
-    --color-accent: #f28c28;
-    --color-bg: #f5f6f2;
-    --color-surface: #ffffff;
-    --color-text: #17211d;
-    --color-muted: #66736c;
-    --color-border: #dce3dd;
-    --color-success: #238653;
-    --color-warning: #c27a13;
-    --color-danger: #c43d3d;
-    --color-info: #2876b8;
+    /* Nilai disimpan sebagai channel RGB tanpa koma agar modifier opasitas
+       Tailwind (mis. `bg-primary/10`) tetap berfungsi. */
+    --color-primary: 23 63 53; /* #173F35 */
+    --color-primary-hover: 36 87 71; /* #245747 */
+    --color-brand: 23 63 53; /* #173F35 */
+    --color-brand-hover: 36 87 71; /* #245747 */
+    --color-accent: 242 140 40; /* #F28C28 */
+    --color-accent-ink: 138 74 4; /* #8A4A04 */
+    --color-bg: 245 246 242; /* #F5F6F2 */
+    --color-surface: 255 255 255; /* #FFFFFF */
+    --color-text: 23 33 29; /* #17211D */
+    --color-muted: 102 115 108; /* #66736C */
+    --color-border: 220 227 221; /* #DCE3DD */
+    --color-success: 35 134 83; /* #238653 */
+    --color-warning: 194 122 19; /* #C27A13 */
+    --color-danger: 196 61 61; /* #C43D3D */
+    --color-info: 40 118 184; /* #2876B8 */
+    --ring-offset: #f5f6f2;
+    color-scheme: light;
+  }
+
+  /* Mode gelap: `primary` jadi hijau terang (untuk teks/tint) sementara
+     `brand` tetap hijau tua untuk latar solid berteks putih. */
+  .dark {
+    --color-primary: 110 214 170; /* #6ED6AA */
+    --color-primary-hover: 130 226 184; /* #82E2B8 */
+    --color-brand: 26 74 60; /* #1A4A3C */
+    --color-brand-hover: 36 94 76; /* #245E4C */
+    --color-accent: 245 158 66; /* #F59E42 */
+    --color-accent-ink: 245 185 113; /* #F5B971 */
+    --color-bg: 13 18 16; /* #0D1210 */
+    --color-surface: 22 29 26; /* #161D1A */
+    --color-text: 232 238 233; /* #E8EEE9 */
+    --color-muted: 150 165 156; /* #96A59C */
+    --color-border: 42 53 48; /* #2A3530 */
+    --color-success: 74 200 140; /* #4AC88C */
+    --color-warning: 235 178 76; /* #EBB24C */
+    --color-danger: 240 118 118; /* #F07676 */
+    --color-info: 108 175 235; /* #6CAFEB */
+  }
+
+  /* Warna offset focus mengikuti tema; wajib di setiap elemen karena Tailwind
+     menetapkan `--tw-ring-offset-color` per-elemen pada reset-nya. */
+  *,
+  ::before,
+  ::after {
+    --tw-ring-offset-color: rgb(var(--color-bg));
   }
 
   html {
@@ -28,7 +63,7 @@
   }
 
   :focus-visible {
-    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-white;
+    @apply outline-none ring-2 ring-accent ring-offset-2;
   }
 
   h1,
