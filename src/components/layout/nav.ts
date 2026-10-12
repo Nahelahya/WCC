@@ -29,8 +29,8 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/app', label: 'Dashboard Coach', icon: 'home', mobile: true, end: true },
     { to: '/app/jadwal', label: 'Jadwal yang Diampu', icon: 'calendar', mobile: true },
     { to: '/app/absensi', label: 'Daftar Hadir', icon: 'list', mobile: true },
-    { to: '/app/pengumuman', label: 'Pengumuman', icon: 'megaphone', mobile: true },
-    { to: '/app/kas', label: 'Kas & Treasury', icon: 'wallet' },
+    { to: '/app/kas', label: 'Kas & Treasury', icon: 'wallet', mobile: true },
+    { to: '/app/pengumuman', label: 'Pengumuman', icon: 'megaphone' },
     { to: '/app/profil', label: 'Profil Akun', icon: 'user' },
   ],
   pengurus: [

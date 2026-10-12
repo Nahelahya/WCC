@@ -208,7 +208,13 @@ function CoachDashboard() {
     <>
       <PageHeader
         title="Dashboard Coach"
-        description="Sesi latihan yang Anda ampu dan daftar hadir peserta."
+        description="Sesi latihan yang Anda ampu, daftar hadir peserta, dan kas klub."
+        action={
+          <Link to="/app/kas" className={buttonClasses('primary', 'md')}>
+            <Icon name="wallet" size={17} />
+            Kas Klub
+          </Link>
+        }
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
