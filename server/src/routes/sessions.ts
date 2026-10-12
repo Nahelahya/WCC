@@ -56,7 +56,7 @@ sessionRouter.get(
 sessionRouter.post(
   '/',
   requireAuth,
-  requireRole('pengurus'),
+  requireRole('pengurus', 'coach'),
   wrap(async (req, res) => {
     const input = sessionFields.parse(req.body ?? {})
     if (input.endTime <= input.startTime) {
@@ -86,7 +86,7 @@ sessionRouter.post(
 sessionRouter.patch(
   '/:id',
   requireAuth,
-  requireRole('pengurus'),
+  requireRole('pengurus', 'coach'),
   wrap(async (req, res) => {
     const patch = sessionFields.partial().parse(req.body ?? {})
     const { rows: existing } = await query<SessionRow>('select * from sessions where id = $1', [
@@ -135,7 +135,7 @@ sessionRouter.patch(
 sessionRouter.delete(
   '/:id',
   requireAuth,
-  requireRole('pengurus'),
+  requireRole('pengurus', 'coach'),
   wrap(async (req, res) => {
     const { rowCount } = await query('delete from sessions where id = $1', [req.params.id])
     if (!rowCount) throw ApiError.notFound('Sesi tidak ditemukan.')

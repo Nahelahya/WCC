@@ -143,7 +143,7 @@ export function SchedulePage() {
               ? 'Sesi latihan yang menjadi tanggung jawab Anda.'
               : 'Jadwal latihan mendatang beserta status sesi.'
         }
-        action={isAdmin ? <Button icon="calendar-plus" onClick={openCreate}>Tambah Jadwal</Button> : undefined}
+        action={isAdmin || isCoach ? <Button icon="calendar-plus" onClick={openCreate}>Tambah Jadwal</Button> : undefined}
       />
 
       {/* Filter */}
@@ -222,7 +222,7 @@ export function SchedulePage() {
             icon="calendar"
             title="Belum ada jadwal latihan mendatang."
             description="Ubah filter atau tambahkan jadwal baru."
-            action={isAdmin ? <Button icon="plus" onClick={openCreate}>Tambah Jadwal</Button> : undefined}
+            action={isAdmin || isCoach ? <Button icon="plus" onClick={openCreate}>Tambah Jadwal</Button> : undefined}
           />
         </div>
       ) : (
@@ -239,7 +239,7 @@ export function SchedulePage() {
                 coach={coaches.data?.find((c) => c.id === s.coachId) ?? null}
                 to={`/app/jadwal/${s.id}`}
                 action={
-                  isAdmin ? (
+                  isAdmin || isCoach ? (
                     <div className="flex gap-2">
                       <Button variant="secondary" size="sm" icon="edit" onClick={() => openEdit(s)}>
                         Edit
@@ -256,7 +256,7 @@ export function SchedulePage() {
         </>
       )}
 
-      {isAdmin && (
+      {isAdmin || isCoach && (
         <>
           <Modal
             open={formOpen}
