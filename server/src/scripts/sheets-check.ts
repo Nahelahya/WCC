@@ -9,6 +9,12 @@
 import { pool, query } from '../db/pool'
 import { getSheetsConfig, pingSheet } from '../lib/sheets'
 
+function modeLabel(mode: string): string {
+  if (mode === 'apps-script') return 'Apps Script Web App'
+  if (mode === 'oauth') return 'OAuth 2.0 (akun Google)'
+  return 'Service Account'
+}
+
 async function main(): Promise<void> {
   const cfg = getSheetsConfig()
 
@@ -17,7 +23,7 @@ async function main(): Promise<void> {
   console.log('  -------------------------------------')
   console.log(`  Status          : ${cfg.configured ? 'SIAP' : 'BELUM SIAP'}`)
   if (!cfg.configured) console.log(`  Alasan          : ${cfg.reason}`)
-  console.log(`  Mode            : ${cfg.mode === 'apps-script' ? 'Apps Script Web App' : 'Service Account'}`)
+  console.log(`  Mode            : ${modeLabel(cfg.mode)}`)
   console.log(`  Spreadsheet ID  : ${cfg.spreadsheetId || '(kosong)'}`)
   console.log(`  Tab tujuan      : "${cfg.tab}"`)
   if (cfg.mode === 'service-account') console.log(`  Service account : ${cfg.serviceAccountEmail ?? '(tidak diketahui)'}`)
@@ -34,6 +40,10 @@ async function main(): Promise<void> {
     console.log('   B. Service account:')
     console.log('      a. Isi GOOGLE_SHEETS_ID dan GOOGLE_SERVICE_ACCOUNT_FILE (atau _JSON) di server/.env')
     console.log('      b. Bagikan spreadsheet ke service account sebagai Editor')
+    console.log('   C. OAuth 2.0 (akun Google pemilik spreadsheet):')
+    console.log('      a. Isi GOOGLE_SHEETS_ID, GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET,')
+    console.log('         dan GOOGLE_OAUTH_REFRESH_TOKEN di server/.env')
+    console.log('      b. Lihat README bagian 9 untuk cara mengambil refresh token')
     console.log('   Lalu jalankan ulang: npm run sheets:check')
     console.log('')
     process.exitCode = 1

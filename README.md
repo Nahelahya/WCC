@@ -345,10 +345,11 @@ server/                      # BACKEND
 
 ## 9. Sinkronisasi Google Sheets (poin 3)
 
-Backend menyinkronkan **kas klub** ke Google Sheets. Ada **dua cara** integrasi:
+Backend menyinkronkan **kas klub** ke Google Sheets. Ada **tiga cara** integrasi:
 
 - **Cara A — Apps Script Web App** (paling mudah, tanpa Google Cloud Console).
 - **Cara B — Service account** (butuh Google Cloud Console).
+- **Cara C — OAuth 2.0** (memakai akun Google pemilik spreadsheet; butuh Cloud Console + refresh token).
 
 UI hanya menampilkan status & log — kredensial (JSON) maupun URL rahasia tidak pernah keluar dari server.
 
@@ -415,11 +416,52 @@ Tidak perlu Google Cloud Console. Skrip lengkap ada di
    npm run sheets:check      # periksa token, akses tab, dan jumlah transaksi
    ```
 
+### 9.3 Cara C — OAuth 2.0 (pakai akun Google sendiri)
+
+Cocok bila Anda ingin sinkron **tanpa** membuat Service Account, memakai akun Google yang
+memang memiliki spreadsheet tersebut. Server hanya butuh **refresh token** (tidak login ulang).
+
+1. Di [Google Cloud Console](https://console.cloud.google.com/) → proyek (mis. `wcc-sheets`)
+   → **APIs & Services → Library** → aktifkan **Google Sheets API**.
+2. **APIs & Services → OAuth consent screen**:
+   - User type **External** → isi nama aplikasi + email → **Save and continue**.
+   - Scopes: tambahkan `https://www.googleapis.com/auth/spreadsheets`.
+   - Test users: tambahkan email Google pemilik spreadsheet.
+   - **Publish app** (status *In production*) — supaya refresh token tidak kedaluwarsa dalam 7 hari.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID**:
+   - Application type **Web application**.
+   - **Authorized redirect URIs**: tambahkan `https://developers.google.com/oauthplayground`.
+   - Simpan **Client ID** dan **Client Secret**.
+4. Ambil refresh token lewat [OAuth 2.0 Playground](https://developers.google.com/oauthplayground):
+   - Klik ikon gear ⚙️ → centang **Use your own OAuth credentials** → isi Client ID & Secret.
+   - Di **Step 1**, pilih scope **Google Sheets API v4 → `https://www.googleapis.com/auth/spreadsheets`**
+     → **Authorize APIs** → login dengan akun pemilik spreadsheet → **Allow**.
+   - **Step 2** → **Exchange authorization code for tokens** → salin **Refresh token**.
+     (Bila tidak muncul, buka https://myaccount.google.com/permissions, hapus akses aplikasi,
+     lalu ulangi langkah ini.)
+5. Isi `server/.env`:
+
+   ```ini
+   GOOGLE_SHEETS_ID=<id-spreadsheet>     # bagian antara /d/ dan /edit pada URL
+   GOOGLE_SHEETS_TAB=Kas
+   GOOGLE_OAUTH_CLIENT_ID=<client-id>.apps.googleusercontent.com
+   GOOGLE_OAUTH_CLIENT_SECRET=<client-secret>
+   GOOGLE_OAUTH_REFRESH_TOKEN=<refresh-token>
+   ```
+
+6. Uji koneksi: `cd server && npm run sheets:check`.
+
+> Bila consent screen masih *Testing*, refresh token akan kedaluwarsa dalam **7 hari** — jadi
+> pilih **Publish app**. Bila suatu saat muncul galat “Refresh token tidak valid”, cukup buat
+> refresh token baru dan perbarui `GOOGLE_OAUTH_REFRESH_TOKEN`.
+
 Lalu buka `/app/sinkronisasi` dan klik **Sinkronkan Sekarang**.
 
 **Pesan kegagalan** disajikan dalam bahasa yang mudah dipahami, misalnya:
 
 - *“Akses ke spreadsheet ditolak. Bagikan spreadsheet ke … sebagai Editor, lalu coba lagi.”*
+- *“Refresh token OAuth tidak valid atau sudah kedaluwarsa. Buat refresh token baru …”*
+- *“Google menolak akses (401/403). Pastikan akun pemilik refresh token berhak mengedit spreadsheet …”*
 - *“Spreadsheet tidak ditemukan. Periksa kembali GOOGLE_SHEETS_ID…”*
 - *“Tidak dapat menghubungi Google Sheets. Periksa koneksi server dan coba lagi.”*
 - *“Tidak dapat menghubungi Google Apps Script. Periksa URL Web App dan coba lagi.”* (mode Apps Script)

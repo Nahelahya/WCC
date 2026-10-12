@@ -114,8 +114,8 @@ export interface SyncState {
   log: SyncLogEntry[]
   /** Info konfigurasi dari server (mode live); `false` = belum siap dipakai. */
   configured?: boolean
-  /** Cara integrasi yang aktif: service account (Cloud) atau Apps Script (Web App). */
-  mode?: 'service-account' | 'apps-script'
+  /** Cara integrasi yang aktif: service account (Cloud), Apps Script (Web App), atau OAuth 2.0. */
+  mode?: 'service-account' | 'apps-script' | 'oauth'
   reason?: string
   spreadsheetId?: string
   tab?: string

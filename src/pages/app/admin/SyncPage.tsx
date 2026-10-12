@@ -62,6 +62,11 @@ export function SyncPage() {
               <code>GOOGLE_SERVICE_ACCOUNT_JSON</code>, lalu bagikan spreadsheet ke{' '}
               <strong>{s.serviceAccountEmail ?? 'email service account'}</strong> sebagai Editor.
             </li>
+            <li>
+              <strong>OAuth 2.0</strong> — isi <code>GOOGLE_OAUTH_CLIENT_ID</code>,{' '}
+              <code>GOOGLE_OAUTH_CLIENT_SECRET</code>, dan <code>GOOGLE_OAUTH_REFRESH_TOKEN</code> pada{' '}
+              <code>server/.env</code>.
+            </li>
           </ul>
           {s.reason ? <p className="mt-1.5 text-[12.5px] text-muted">Penyebab: {s.reason}</p> : null}
         </Alert>
@@ -69,7 +74,10 @@ export function SyncPage() {
 
       {s && s.configured && (
         <Alert tone="success" className="mb-5" title="Terhubung ke Google Sheets">
-          Mode: <strong>{s.mode === 'apps-script' ? 'Google Apps Script' : 'Service Account'}</strong>
+          Mode:{' '}
+          <strong>
+            {s.mode === 'apps-script' ? 'Google Apps Script' : s.mode === 'oauth' ? 'OAuth 2.0' : 'Service Account'}
+          </strong>
           {' · '}Tab: <code>{s.tab ?? 'Kas'}</code>
           {s.spreadsheetId ? (
             <>

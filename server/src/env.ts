@@ -43,6 +43,14 @@ export const env = {
   googleServiceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON ?? '',
   googleServiceAccountFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE ?? '',
   /**
+   * Alternatif lain: OAuth 2.0 memakai akun Google pemilik spreadsheet.
+   * Butuh Client ID + Client Secret (dari Google Cloud Console) dan sebuah
+   * refresh token hasil otorisasi sekali (lihat docs/apps-script/README bagian OAuth).
+   */
+  googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID ?? '',
+  googleOAuthClientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? '',
+  googleOAuthRefreshToken: process.env.GOOGLE_OAUTH_REFRESH_TOKEN ?? '',
+  /**
    * Alternatif tanpa Service Account: URL Web App Google Apps Script yang
    * di-deploy dari spreadsheet tujuan. Bila diisi, mode ini dipakai (lebih mudah
    * dibuat: cukup Extensions → Apps Script, tanpa Google Cloud Console).

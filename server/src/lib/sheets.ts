@@ -26,8 +26,11 @@ export interface SheetsConfig {
   configured: boolean
   /** Alasan bila belum siap dipakai (hanya diisi ketika `configured = false`). */
   reason?: string
-  /** Cara integrasi: service account (Cloud Console) atau Web App Apps Script. */
-  mode: 'service-account' | 'apps-script'
+  /**
+   * Cara integrasi: service account (Cloud Console), Web App Apps Script, atau
+   * OAuth 2.0 memakai akun Google pemilik spreadsheet.
+   */
+  mode: 'service-account' | 'apps-script' | 'oauth'
   spreadsheetId: string
   tab: string
   serviceAccountEmail?: string
@@ -68,6 +71,9 @@ function loadServiceAccount(): ServiceAccount {
 
 let cachedConfig: SheetsConfig | null = null
 
+/** Cache access token OAuth (mode `oauth`) agar tidak menukar token tiap permintaan. */
+let oauthTokenCache: { token: string; expiresAt: number } | null = null
+
 /** Ringkasan konfigurasi (aman ditampilkan; tanpa private key / URL rahasia). */
 export function getSheetsConfig(): SheetsConfig {
   if (cachedConfig) return cachedConfig
@@ -78,6 +84,27 @@ export function getSheetsConfig(): SheetsConfig {
   // Mode Apps Script diprioritaskan bila URL Web App tersedia.
   if (appsScriptUrl) {
     cachedConfig = { configured: true, mode: 'apps-script', spreadsheetId, tab, appsScriptUrl }
+    return cachedConfig
+  }
+
+  // Mode OAuth dipakai bila Client ID + Secret + refresh token lengkap.
+  const oauthReady =
+    Boolean(env.googleOAuthClientId.trim()) &&
+    Boolean(env.googleOAuthClientSecret.trim()) &&
+    Boolean(env.googleOAuthRefreshToken.trim())
+  if (oauthReady) {
+    try {
+      if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_ID belum diisi.')
+      cachedConfig = { configured: true, mode: 'oauth', spreadsheetId, tab }
+    } catch (error) {
+      cachedConfig = {
+        configured: false,
+        mode: 'oauth',
+        reason: error instanceof Error ? error.message : String(error),
+        spreadsheetId,
+        tab,
+      }
+    }
     return cachedConfig
   }
 
@@ -110,6 +137,7 @@ export function isSheetsConfigured(): boolean {
 /** Hanya untuk pengujian: paksa konfigurasi dibaca ulang dari `env`. */
 export function resetSheetsConfigCache(): void {
   cachedConfig = null
+  oauthTokenCache = null
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
@@ -123,7 +151,7 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
 }
 
 /** Menukar JWT service account menjadi access token OAuth2. */
-export async function getAccessToken(): Promise<string> {
+async function getServiceAccountToken(): Promise<string> {
   const account = loadServiceAccount()
   const now = Math.floor(Date.now() / 1000)
   const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
@@ -153,7 +181,52 @@ export async function getAccessToken(): Promise<string> {
   return body.access_token
 }
 
+/** Menukar refresh token OAuth menjadi access token (di-cache sampai mendekati kedaluwarsa). */
+async function getOAuthToken(): Promise<string> {
+  const now = Date.now()
+  if (oauthTokenCache && oauthTokenCache.expiresAt > now + 30_000) return oauthTokenCache.token
+
+  const res = await fetchWithTimeout(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: env.googleOAuthClientId.trim(),
+      client_secret: env.googleOAuthClientSecret.trim(),
+      refresh_token: env.googleOAuthRefreshToken.trim(),
+      grant_type: 'refresh_token',
+    }),
+  })
+  const text = await res.text()
+  let body: { access_token?: string; expires_in?: number; error?: string; error_description?: string } = {}
+  try {
+    body = JSON.parse(text) as typeof body
+  } catch {
+    // biarkan body kosong; pesan galat di bawah akan memakai status HTTP
+  }
+  if (!res.ok || !body.access_token) {
+    const error = new Error(
+      `Gagal memperbarui token OAuth Google: ${body.error_description ?? body.error ?? `HTTP ${res.status}`}`,
+    ) as Error & { status?: number }
+    error.status = res.status
+    throw error
+  }
+  const ttlMs = Math.max((body.expires_in ?? 3600) - 60, 60) * 1000
+  oauthTokenCache = { token: body.access_token, expiresAt: Date.now() + ttlMs }
+  return body.access_token
+}
+
+/**
+ * Access token Google sesuai mode integrasi yang aktif.
+ * - `oauth`            → refresh token milik akun pemilik spreadsheet
+ * - `service-account`  → JWT service account
+ */
+export async function getAccessToken(cfg: SheetsConfig = getSheetsConfig()): Promise<string> {
+  if (cfg.mode === 'oauth') return getOAuthToken()
+  return getServiceAccountToken()
+}
+
 async function sheetsFetch(token: string, path: string, init: RequestInit = {}): Promise<Record<string, unknown>> {
+
   const res = await fetchWithTimeout(`${SHEETS_BASE}${path}`, {
     ...init,
     headers: {
@@ -303,7 +376,7 @@ async function appsScriptSync(cfg: SheetsConfig, values: (string | number)[][]):
 export async function syncSheet(cfg: SheetsConfig, values: (string | number)[][]): Promise<SheetSyncResult> {
   if (cfg.mode === 'apps-script') return appsScriptSync(cfg, values)
 
-  const token = await getAccessToken()
+  const token = await getAccessToken(cfg)
   await ensureTab(token, cfg.spreadsheetId, cfg.tab)
   await writeValues(token, cfg.spreadsheetId, cfg.tab, values)
   const readBack = await readValues(token, cfg.spreadsheetId, cfg.tab)
@@ -321,7 +394,7 @@ export async function pingSheet(cfg: SheetsConfig): Promise<{ tab: string }> {
     })
     return { tab: typeof body.tab === 'string' ? body.tab : cfg.tab }
   }
-  const token = await getAccessToken()
+  const token = await getAccessToken(cfg)
   await ensureTab(token, cfg.spreadsheetId, cfg.tab)
   return { tab: cfg.tab }
 }

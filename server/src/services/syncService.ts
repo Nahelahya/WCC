@@ -69,8 +69,15 @@ function friendlyError(error: unknown): string {
     return `Sinkronisasi gagal: ${detail}`
   }
 
+  if (cfg.mode === 'oauth' && /invalid_grant|invalid_client|unauthorized_client|expired|revoked/i.test(detail)) {
+    return 'Refresh token OAuth tidak valid atau sudah kedaluwarsa. Buat refresh token baru lalu perbarui GOOGLE_OAUTH_REFRESH_TOKEN, kemudian coba lagi.'
+  }
+
   const status = (error as { status?: number }).status
   if (status === 401 || status === 403) {
+    if (cfg.mode === 'oauth') {
+      return 'Google menolak akses (401/403). Pastikan akun pemilik refresh token berhak mengedit spreadsheet tujuan, lalu coba lagi.'
+    }
     return `Akses ke spreadsheet ditolak. Bagikan spreadsheet ke ${cfg.serviceAccountEmail ?? 'email service account'} sebagai Editor, lalu coba lagi.`
   }
   if (status === 404) {
