@@ -1,5 +1,6 @@
 import pg from 'pg'
 import { env } from '../env'
+import { normalizeConnectionString } from './connectionString'
 
 // Secara default `pg` mengubah kolom DATE menjadi objek Date (rawan bergeser
 // satu hari karena zona waktu) dan NUMERIC menjadi string. Kita ubah agar:
@@ -9,7 +10,7 @@ pg.types.setTypeParser(1082, (value) => value)
 pg.types.setTypeParser(1700, (value) => (value === null ? null : Number(value)))
 
 export const pool = new pg.Pool({
-  connectionString: env.databaseUrl,
+  connectionString: normalizeConnectionString(env.databaseUrl),
   max: 10,
   idleTimeoutMillis: 30_000,
 })
