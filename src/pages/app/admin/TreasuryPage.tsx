@@ -50,8 +50,11 @@ export function TreasuryPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
-  // Hanya pengurus yang boleh mencatat/mengubah kas. Anggota hanya melihat.
+  // Pengurus = kelola penuh (ubah, hapus, audit, sinkronisasi).
+  // Coach = boleh melihat dan mencatat transaksi baru, tanpa ubah/hapus.
+  // Anggota hanya melihat.
   const isManager = user!.role === 'pengurus'
+  const canCreate = user!.role === 'pengurus' || user!.role === 'coach'
   const [period, setPeriod] = useState(periodDefaults())
   const [typeFilter, setTypeFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -248,18 +251,20 @@ export function TreasuryPage() {
   return (
     <>
       <PageHeader
-        title={isManager ? 'Kas & Treasury' : 'Kas Klub'}
+        title={canCreate ? 'Kas & Treasury' : 'Kas Klub'}
         description={
-          isManager
+          canCreate
             ? 'Catat transaksi pemasukan dan pengeluaran kas klub.'
             : 'Ringkasan saldo dan transaksi kas klub (hanya lihat).'
         }
         action={
-          isManager ? (
+          canCreate ? (
             <>
-              <Button variant="secondary" icon="shield" onClick={() => navigate('/app/audit')}>
-                Jejak Audit
-              </Button>
+              {isManager && (
+                <Button variant="secondary" icon="shield" onClick={() => navigate('/app/audit')}>
+                  Jejak Audit
+                </Button>
+              )}
               <Button icon="plus" onClick={openCreate}>
                 Catat Transaksi
               </Button>
@@ -268,7 +273,7 @@ export function TreasuryPage() {
         }
       />
 
-      {!isManager && (
+      {!canCreate && (
         <Alert tone="info" className="mb-5">
           Anda dapat melihat ringkasan saldo dan daftar transaksi kas klub. Penambahan atau perubahan
           data dilakukan oleh pengurus.

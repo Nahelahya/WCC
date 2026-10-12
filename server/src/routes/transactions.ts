@@ -89,7 +89,9 @@ function snapshot(row: TransactionRow) {
 
 transactionRouter.post(
   '/',
-  requireRole('pengurus'),
+  // Pengurus dan coach boleh mencatat transaksi kas baru. Perubahan dan
+  // penghapusan tetap khusus pengurus (lihat PATCH/DELETE di bawah).
+  requireRole('pengurus', 'coach'),
   wrap(async (req, res) => {
     const input = transactionSchema.parse(req.body ?? {})
     const recordedBy = input.recordedBy ?? (await currentUserName(req.auth!.userId))

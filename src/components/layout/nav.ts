@@ -30,6 +30,7 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/app/jadwal', label: 'Jadwal yang Diampu', icon: 'calendar', mobile: true },
     { to: '/app/absensi', label: 'Daftar Hadir', icon: 'list', mobile: true },
     { to: '/app/pengumuman', label: 'Pengumuman', icon: 'megaphone', mobile: true },
+    { to: '/app/kas', label: 'Kas & Treasury', icon: 'wallet' },
     { to: '/app/profil', label: 'Profil Akun', icon: 'user' },
   ],
   pengurus: [
@@ -66,7 +67,7 @@ export function overflowNavFor(role: Role): NavItem[] {
 /** Halaman apa saja yang boleh diakses tiap peran (otorisasi sisi klien). */
 export const ALLOWED: Record<Role, string[]> = {
   anggota: ['/app', '/app/jadwal', '/app/absensi', '/app/pengumuman', '/app/kas', '/app/profil'],
-  coach: ['/app', '/app/jadwal', '/app/absensi', '/app/pengumuman', '/app/profil'],
+  coach: ['/app', '/app/jadwal', '/app/absensi', '/app/pengumuman', '/app/kas', '/app/profil'],
   pengurus: [
     '/app',
     '/app/jadwal',
