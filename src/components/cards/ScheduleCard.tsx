@@ -18,7 +18,9 @@ interface ScheduleCardProps {
 export function ScheduleCard({ session, coach, to, className, compact, action }: ScheduleCardProps) {
   const status = sessionStatus(session)
 
-  const body = (
+  // Isi kartu (informasi sesi) — TIDAK memuat tombol aksi, supaya tombol
+  // Edit/Hapus tidak berada di dalam tautan detail.
+  const content = (
     <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -58,31 +60,39 @@ export function ScheduleCard({ session, coach, to, className, compact, action }:
       {session.note && (
         <p className="mt-3 rounded-control bg-bg px-3 py-2 text-[13px] text-muted">{session.note}</p>
       )}
-
-      {(action || to) && (
-        <div className="mt-4 flex items-center justify-between gap-3">
-          {action}
-          {to && (
-            <span className="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-primary">
-              Lihat detail
-              <Icon name="chevron-right" size={16} />
-            </span>
-          )}
-        </div>
-      )}
     </>
   )
 
-  if (to) {
+  const detailLabel = (
+    <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary">
+      Lihat detail
+      <Icon name="chevron-right" size={16} />
+    </span>
+  )
+
+  // Tanpa tautan detail: cukup kartu biasa (mis. di dasbor dengan tombol aksi).
+  if (!to) {
     return (
-      <Link
-        to={to}
-        className={cn('card block p-4 transition-all duration-ui hover:border-primary/40 hover:shadow-soft', className)}
-      >
-        {body}
-      </Link>
+      <div className={cn('card p-4', className)}>
+        {content}
+        {action && <div className="mt-4 flex items-center justify-between gap-3">{action}</div>}
+      </div>
     )
   }
 
-  return <div className={cn('card p-4', className)}>{body}</div>
+  // Dengan tautan detail: bagian informasi dibuat tautan, sedangkan tombol aksi
+  // diletakkan DI LUAR tautan supaya klik tombol tidak ikut membuka halaman detail.
+  return (
+    <div className={cn('card p-4 transition-all duration-ui hover:border-primary/40 hover:shadow-soft', className)}>
+      <Link to={to} className="block">
+        {content}
+      </Link>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        {action}
+        <Link to={to} className="ml-auto">
+          {detailLabel}
+        </Link>
+      </div>
+    </div>
+  )
 }
