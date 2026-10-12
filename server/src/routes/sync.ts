@@ -26,6 +26,7 @@ async function loadState() {
     log: log.map(mapSyncLog),
     configured: cfg.configured,
     reason: cfg.configured ? undefined : cfg.reason,
+    mode: cfg.mode,
     spreadsheetId: cfg.spreadsheetId || undefined,
     tab: cfg.tab,
     serviceAccountEmail: cfg.serviceAccountEmail,

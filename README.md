@@ -345,8 +345,12 @@ server/                      # BACKEND
 
 ## 9. Sinkronisasi Google Sheets (poin 3)
 
-Backend menyinkronkan **kas klub** ke Google Sheets memakai *service account*. UI hanya
-menampilkan status & log — kredensial tidak pernah keluar dari server.
+Backend menyinkronkan **kas klub** ke Google Sheets. Ada **dua cara** integrasi:
+
+- **Cara A — Apps Script Web App** (paling mudah, tanpa Google Cloud Console).
+- **Cara B — Service account** (butuh Google Cloud Console).
+
+UI hanya menampilkan status & log — kredensial (JSON) maupun URL rahasia tidak pernah keluar dari server.
 
 **Cara kerja**
 
@@ -359,7 +363,32 @@ menampilkan status & log — kredensial tidak pernah keluar dari server.
 
 Struktur kolom: `Tanggal | Tipe | Kategori | Nominal | Keterangan | Dicatat Oleh`.
 
-### 9.1 Menyiapkan kredensial (sekali saja)
+### 9.1 Cara A — Apps Script Web App (paling mudah)
+
+Tidak perlu Google Cloud Console. Skrip lengkap ada di
+[`docs/apps-script/Code.gs`](docs/apps-script/Code.gs).
+
+1. Buka spreadsheet kas → menu **Extensions → Apps Script**.
+2. Hapus isi editor, tempel seluruh isi `docs/apps-script/Code.gs`.
+3. Ubah `SECRET` pada baris pertama kode menjadi kata sandi acak pilihanmu (catat!).
+4. **Deploy → New deployment → ikon gear → Web app**:
+   - **Execute as:** `Me`
+   - **Who has access:** `Anyone`
+5. **Deploy** → izinkan akses (Review permissions → Advanced → Go to … → Allow).
+6. Salin **Web app URL** (berakhiran `/exec`), lalu isi `server/.env`:
+
+   ```ini
+   GOOGLE_APPS_SCRIPT_URL=https://script.google.com/macros/s/XXXX/exec
+   GOOGLE_APPS_SCRIPT_TOKEN=<nilai SECRET yang sama>
+   GOOGLE_SHEETS_TAB=Kas                 # dibuat otomatis bila belum ada
+   ```
+
+7. Uji koneksi: `cd server && npm run sheets:check`.
+
+> Bila mengubah kode skrip, buat **New deployment** (atau *Manage deployments → Edit → Version: New*)
+> agar URL `/exec` memakai versi terbaru.
+
+### 9.2 Cara B — Service account (Google Cloud Console)
 
 1. Buka [Google Cloud Console](https://console.cloud.google.com/) → buat/pilih proyek.
 2. **APIs & Services → Library** → aktifkan **Google Sheets API**.
@@ -393,6 +422,7 @@ Lalu buka `/app/sinkronisasi` dan klik **Sinkronkan Sekarang**.
 - *“Akses ke spreadsheet ditolak. Bagikan spreadsheet ke … sebagai Editor, lalu coba lagi.”*
 - *“Spreadsheet tidak ditemukan. Periksa kembali GOOGLE_SHEETS_ID…”*
 - *“Tidak dapat menghubungi Google Sheets. Periksa koneksi server dan coba lagi.”*
+- *“Tidak dapat menghubungi Google Apps Script. Periksa URL Web App dan coba lagi.”* (mode Apps Script)
 
 > Selama kredensial belum diisi, `GET /api/sync/status` mengembalikan `configured: false` + `reason`,
 > dan `POST /api/sync/run` membalas **503** dengan pesan yang sama — bukan pura-pura berhasil.

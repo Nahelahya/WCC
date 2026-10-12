@@ -26,9 +26,13 @@ export interface SheetsConfig {
   configured: boolean
   /** Alasan bila belum siap dipakai (hanya diisi ketika `configured = false`). */
   reason?: string
+  /** Cara integrasi: service account (Cloud Console) atau Web App Apps Script. */
+  mode: 'service-account' | 'apps-script'
   spreadsheetId: string
   tab: string
   serviceAccountEmail?: string
+  /** URL Web App Apps Script — RAHASIA, jangan pernah dikembalikan ke klien. */
+  appsScriptUrl?: string
 }
 
 function base64url(input: Buffer | string): string {
@@ -64,18 +68,33 @@ function loadServiceAccount(): ServiceAccount {
 
 let cachedConfig: SheetsConfig | null = null
 
-/** Ringkasan konfigurasi (aman ditampilkan; tanpa private key). */
+/** Ringkasan konfigurasi (aman ditampilkan; tanpa private key / URL rahasia). */
 export function getSheetsConfig(): SheetsConfig {
   if (cachedConfig) return cachedConfig
   const spreadsheetId = env.googleSheetsId.trim()
   const tab = env.googleSheetsTab.trim() || 'Kas'
+  const appsScriptUrl = env.googleAppsScriptUrl.trim()
+
+  // Mode Apps Script diprioritaskan bila URL Web App tersedia.
+  if (appsScriptUrl) {
+    cachedConfig = { configured: true, mode: 'apps-script', spreadsheetId, tab, appsScriptUrl }
+    return cachedConfig
+  }
+
   try {
     const account = loadServiceAccount()
     if (!spreadsheetId) throw new Error('GOOGLE_SHEETS_ID belum diisi.')
-    cachedConfig = { configured: true, spreadsheetId, tab, serviceAccountEmail: account.client_email }
+    cachedConfig = {
+      configured: true,
+      mode: 'service-account',
+      spreadsheetId,
+      tab,
+      serviceAccountEmail: account.client_email,
+    }
   } catch (error) {
     cachedConfig = {
       configured: false,
+      mode: 'service-account',
       reason: error instanceof Error ? error.message : String(error),
       spreadsheetId,
       tab,
@@ -210,4 +229,99 @@ function columnLabel(count: number): string {
     n = Math.floor((n - 1) / 26)
   }
   return label || 'A'
+}
+
+/* ------------------------------------------------------------------ */
+/* Transport terpadu: tulis penuh + baca ulang (mode-aware)            */
+/* ------------------------------------------------------------------ */
+
+export interface SheetSyncResult {
+  rows: number
+  /** Isi tab setelah ditulis (baris pertama = header), sudah berupa teks. */
+  readBack: string[][]
+}
+
+interface AppScriptBody {
+  ok?: boolean
+  error?: string
+  rows?: number
+  readBack?: unknown
+  tab?: string
+}
+
+/**
+ * Memanggil Web App Google Apps Script (`doPost`).
+ *
+ * Memakai `Content-Type: text/plain` agar tidak memicu preflight dan agar isi
+ * permintaan dapat dibaca utuh lewat `e.postData.contents` di sisi Apps Script.
+ */
+async function appsScriptRequest(url: string, payload: Record<string, unknown>): Promise<AppScriptBody> {
+  const res = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+  })
+  const text = await res.text()
+  let body: AppScriptBody
+  try {
+    body = JSON.parse(text) as AppScriptBody
+  } catch {
+    const error = new Error(
+      'Respons Apps Script tidak valid (bukan JSON). Pastikan Web App di-deploy dengan ' +
+        '"Who has access: Anyone" dan URL berakhiran /exec.',
+    ) as Error & { status?: number }
+    error.status = res.status
+    throw error
+  }
+  if (!res.ok || body.ok === false) {
+    const error = new Error(body.error ?? `Apps Script menolak permintaan (HTTP ${res.status}).`) as Error & {
+      status?: number
+    }
+    error.status = res.status
+    throw error
+  }
+  return body
+}
+
+async function appsScriptSync(cfg: SheetsConfig, values: (string | number)[][]): Promise<SheetSyncResult> {
+  if (!cfg.appsScriptUrl) throw new Error('GOOGLE_APPS_SCRIPT_URL belum diisi.')
+  const body = await appsScriptRequest(cfg.appsScriptUrl, {
+    action: 'sync',
+    tab: cfg.tab,
+    token: env.googleAppsScriptToken || undefined,
+    values,
+  })
+  const readBack = Array.isArray(body.readBack) ? (body.readBack as string[][]) : []
+  return { rows: typeof body.rows === 'number' ? body.rows : values.length, readBack }
+}
+
+/**
+ * Menimpa seluruh isi tab dengan `values` lalu membacanya kembali, apa pun
+ * modenya (service account / Apps Script). Dipakai `syncService` untuk
+ * sinkronisasi penuh sekaligus rekonsiliasi.
+ */
+export async function syncSheet(cfg: SheetsConfig, values: (string | number)[][]): Promise<SheetSyncResult> {
+  if (cfg.mode === 'apps-script') return appsScriptSync(cfg, values)
+
+  const token = await getAccessToken()
+  await ensureTab(token, cfg.spreadsheetId, cfg.tab)
+  await writeValues(token, cfg.spreadsheetId, cfg.tab, values)
+  const readBack = await readValues(token, cfg.spreadsheetId, cfg.tab)
+  return { rows: values.length, readBack }
+}
+
+/** Uji koneksi ringan tanpa mengubah data (dipakai `npm run sheets:check`). */
+export async function pingSheet(cfg: SheetsConfig): Promise<{ tab: string }> {
+  if (cfg.mode === 'apps-script') {
+    if (!cfg.appsScriptUrl) throw new Error('GOOGLE_APPS_SCRIPT_URL belum diisi.')
+    const body = await appsScriptRequest(cfg.appsScriptUrl, {
+      action: 'ping',
+      tab: cfg.tab,
+      token: env.googleAppsScriptToken || undefined,
+    })
+    return { tab: typeof body.tab === 'string' ? body.tab : cfg.tab }
+  }
+  const token = await getAccessToken()
+  await ensureTab(token, cfg.spreadsheetId, cfg.tab)
+  return { tab: cfg.tab }
 }

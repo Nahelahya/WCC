@@ -51,10 +51,31 @@ export function SyncPage() {
 
       {s && s.configured === false && (
         <Alert tone="warning" className="mb-5" title="Google Sheets belum dikonfigurasi">
-          Minta admin server melengkapi <code>GOOGLE_SHEETS_ID</code> dan kredensial service account pada{' '}
-          <code>server/.env</code>, lalu bagikan spreadsheet ke{' '}
-          <strong>{s.serviceAccountEmail ?? 'email service account'}</strong> sebagai Editor.
-          {s.reason ? ` Penyebab: ${s.reason}` : ''}
+          <p>Server belum memiliki kredensial Google Sheets. Pilih salah satu cara:</p>
+          <ul className="mt-1.5 list-disc space-y-1 pl-5">
+            <li>
+              <strong>Apps Script (mudah)</strong> — deploy Web App dari spreadsheet, lalu isi{' '}
+              <code>GOOGLE_APPS_SCRIPT_URL</code> pada <code>server/.env</code>.
+            </li>
+            <li>
+              <strong>Service Account</strong> — isi <code>GOOGLE_SERVICE_ACCOUNT_FILE</code> /{' '}
+              <code>GOOGLE_SERVICE_ACCOUNT_JSON</code>, lalu bagikan spreadsheet ke{' '}
+              <strong>{s.serviceAccountEmail ?? 'email service account'}</strong> sebagai Editor.
+            </li>
+          </ul>
+          {s.reason ? <p className="mt-1.5 text-[12.5px] text-muted">Penyebab: {s.reason}</p> : null}
+        </Alert>
+      )}
+
+      {s && s.configured && (
+        <Alert tone="success" className="mb-5" title="Terhubung ke Google Sheets">
+          Mode: <strong>{s.mode === 'apps-script' ? 'Google Apps Script' : 'Service Account'}</strong>
+          {' · '}Tab: <code>{s.tab ?? 'Kas'}</code>
+          {s.spreadsheetId ? (
+            <>
+              {' · '}ID: <code>{s.spreadsheetId}</code>
+            </>
+          ) : null}
         </Alert>
       )}
 

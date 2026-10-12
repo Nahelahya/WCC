@@ -42,6 +42,14 @@ export const env = {
   googleSheetsTab: process.env.GOOGLE_SHEETS_TAB ?? 'Kas',
   googleServiceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON ?? '',
   googleServiceAccountFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE ?? '',
+  /**
+   * Alternatif tanpa Service Account: URL Web App Google Apps Script yang
+   * di-deploy dari spreadsheet tujuan. Bila diisi, mode ini dipakai (lebih mudah
+   * dibuat: cukup Extensions → Apps Script, tanpa Google Cloud Console).
+   */
+  googleAppsScriptUrl: process.env.GOOGLE_APPS_SCRIPT_URL ?? '',
+  /** Rahasia bersama opsional yang ikut dikirim ke Web App (lihat Google Apps Script). */
+  googleAppsScriptToken: process.env.GOOGLE_APPS_SCRIPT_TOKEN ?? '',
   // 0 = hanya sinkronisasi manual lewat tombol "Sinkronkan Sekarang".
   sheetsSyncIntervalMinutes: Number(process.env.SHEETS_SYNC_INTERVAL_MINUTES ?? 0),
   sheetsRequestTimeoutMs: Number(process.env.SHEETS_REQUEST_TIMEOUT_MS ?? 15000),

@@ -3,12 +3,9 @@ import { newId } from '../lib/ids'
 import { ApiError } from '../lib/errors'
 import type { TransactionRow } from '../lib/mappers'
 import {
-  ensureTab,
-  getAccessToken,
   getSheetsConfig,
   isSheetsConfigured,
-  readValues,
-  writeValues,
+  syncSheet,
 } from '../lib/sheets'
 
 /**
@@ -59,20 +56,27 @@ async function writeLog(status: 'success' | 'failed', message: string, rows = 0)
 
 /** Mengubah galat teknis menjadi pesan yang bisa dipahami pengurus. */
 function friendlyError(error: unknown): string {
-  const status = (error as { status?: number }).status
-  const email = getSheetsConfig().serviceAccountEmail
+  const cfg = getSheetsConfig()
+  const detail = error instanceof Error ? error.message : String(error)
 
+  if (/abort|timeout|fetch failed|ENOTFOUND|ECONNRESET|ETIMEDOUT/i.test(detail)) {
+    return cfg.mode === 'apps-script'
+      ? 'Tidak dapat menghubungi Google Apps Script. Periksa URL Web App dan coba lagi.'
+      : 'Tidak dapat menghubungi Google Sheets. Periksa koneksi server dan coba lagi.'
+  }
+
+  if (cfg.mode === 'apps-script') {
+    return `Sinkronisasi gagal: ${detail}`
+  }
+
+  const status = (error as { status?: number }).status
   if (status === 401 || status === 403) {
-    return `Akses ke spreadsheet ditolak. Bagikan spreadsheet ke ${email ?? 'email service account'} sebagai Editor, lalu coba lagi.`
+    return `Akses ke spreadsheet ditolak. Bagikan spreadsheet ke ${cfg.serviceAccountEmail ?? 'email service account'} sebagai Editor, lalu coba lagi.`
   }
   if (status === 404) {
     return 'Spreadsheet tidak ditemukan. Periksa kembali GOOGLE_SHEETS_ID (ID ada pada URL spreadsheet).'
   }
 
-  const detail = error instanceof Error ? error.message : String(error)
-  if (/abort|timeout|fetch failed|ENOTFOUND|ECONNRESET|ETIMEDOUT/i.test(detail)) {
-    return 'Tidak dapat menghubungi Google Sheets. Periksa koneksi server dan coba lagi.'
-  }
   return `Sinkronisasi gagal: ${detail}`
 }
 
@@ -108,23 +112,19 @@ export async function runSync(trigger: 'manual' | 'scheduled'): Promise<SyncRunR
       ]),
     ]
 
-    const token = await getAccessToken()
-    await ensureTab(token, cfg.spreadsheetId, cfg.tab)
-    await writeValues(token, cfg.spreadsheetId, cfg.tab, values)
+    const { readBack } = await syncSheet(cfg, values)
 
-    // Rekonsiliasi: baca ulang, bandingkan jumlah baris dan total nominal.
-    const readBack = (await readValues(token, cfg.spreadsheetId, cfg.tab))
-      .slice(1)
-      .filter((line) => (line[0] ?? '').trim() !== '')
+    // Rekonsiliasi: bandingkan jumlah baris dan total nominal.
+    const readBackRows = readBack.slice(1).filter((line) => (line[0] ?? '').trim() !== '')
     const expectedTotal = rows.reduce((sum, row) => sum + Number(row.amount), 0)
-    const actualTotal = readBack.reduce((sum, line) => sum + Number(line[3] ?? 0), 0)
-    const reconciled = readBack.length === rows.length && Math.abs(actualTotal - expectedTotal) < 0.01
+    const actualTotal = readBackRows.reduce((sum, line) => sum + Number(line[3] ?? 0), 0)
+    const reconciled = readBackRows.length === rows.length && Math.abs(actualTotal - expectedTotal) < 0.01
 
     if (!reconciled) {
       const message =
         `Sinkron ke "${cfg.tab}" selesai, tetapi rekonsiliasi tidak cocok ` +
-        `(${readBack.length} dari ${rows.length} baris terbaca). Periksa kembali spreadsheet.`
-      await writeLog('failed', message, readBack.length)
+        `(${readBackRows.length} dari ${rows.length} baris terbaca). Periksa kembali spreadsheet.`
+      await writeLog('failed', message, readBackRows.length)
       await setState('failed', null)
       throw ApiError.badGateway(message)
     }
