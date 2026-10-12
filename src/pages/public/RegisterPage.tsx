@@ -14,6 +14,8 @@ import type { Registration } from '@/types'
 interface FormState {
   fullName: string
   email: string
+  password: string
+  confirmPassword: string
   phone: string
   experience: string
   motivation: string
@@ -23,6 +25,8 @@ interface FormState {
 const EMPTY: FormState = {
   fullName: '',
   email: '',
+  password: '',
+  confirmPassword: '',
   phone: '',
   experience: '',
   motivation: '',
@@ -46,6 +50,10 @@ export function RegisterPage() {
     if (!form.fullName.trim()) e.fullName = 'Nama lengkap wajib diisi.'
     if (!form.email.trim()) e.email = 'Email wajib diisi.'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Format email tidak valid.'
+    if (!form.password) e.password = 'Password wajib diisi.'
+    else if (form.password.length < 8) e.password = 'Password minimal 8 karakter.'
+    if (!form.confirmPassword) e.confirmPassword = 'Konfirmasi password wajib diisi.'
+    else if (form.confirmPassword !== form.password) e.confirmPassword = 'Konfirmasi password tidak sama.'
     if (!form.phone.trim()) e.phone = 'Nomor kontak wajib diisi.'
     else if (form.phone.replace(/\D/g, '').length < 9) e.phone = 'Nomor kontak terlalu pendek.'
     if (!form.experience.trim()) e.experience = 'Ceritakan pengalaman Anda (isi "-" jika belum pernah).'
@@ -60,7 +68,15 @@ export function RegisterPage() {
     setGeneralError(null)
     setSubmitting(true)
     try {
-      const created = await registrationApi.submit(form)
+      const created = await registrationApi.submit({
+        fullName: form.fullName,
+        email: form.email,
+        phone: form.phone,
+        experience: form.experience,
+        motivation: form.motivation,
+        consent: form.consent,
+        password: form.password,
+      })
       setResult(created)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
@@ -81,6 +97,10 @@ export function RegisterPage() {
           <p className="mt-2 text-sm text-muted">
             Terima kasih, <span className="font-semibold text-ink">{result.fullName}</span>. Data Anda telah
             kami terima dan sedang menunggu verifikasi pengurus (maksimal 2 hari kerja).
+          </p>
+          <p className="mt-2 text-sm text-muted">
+            Setelah diverifikasi, akun Anda otomatis aktif — silakan masuk menggunakan <strong>email</strong>{' '}
+            dan <strong>password</strong> yang Anda buat tadi.
           </p>
 
           <dl className="mt-6 grid gap-3 rounded-card border border-line bg-bg/60 p-4 sm:grid-cols-2">
@@ -167,6 +187,30 @@ export function RegisterPage() {
             autoComplete="email"
             required
           />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label="Password"
+              type="password"
+              value={form.password}
+              onChange={(e) => set('password', e.target.value)}
+              error={errors.password}
+              placeholder="Minimal 8 karakter"
+              helper="Password untuk masuk setelah pendaftaran diverifikasi."
+              autoComplete="new-password"
+              required
+            />
+            <Input
+              label="Konfirmasi password"
+              type="password"
+              value={form.confirmPassword}
+              onChange={(e) => set('confirmPassword', e.target.value)}
+              error={errors.confirmPassword}
+              placeholder="Ulangi password"
+              autoComplete="new-password"
+              required
+            />
+          </div>
 
           <Input
             label="Nomor kontak"
@@ -307,7 +351,7 @@ export function RegisterStatusPage() {
                       {r.status === 'baru' &&
                         'Pendaftaran Anda sedang ditinjau pengurus. Mohon menunggu maksimal 2 hari kerja.'}
                       {r.status === 'diverifikasi' &&
-                        'Pendaftaran diverifikasi. Silakan ikuti sesi orientasi dan hubungi pengurus untuk akses akun.'}
+                        'Pendaftaran diverifikasi. Akun Anda sudah aktif — silakan masuk menggunakan email dan password yang Anda buat saat mendaftar.'}
                       {r.status === 'ditolak' &&
                         'Pendaftaran belum dapat diterima. Silakan hubungi pengurus untuk informasi lebih lanjut.'}
                     </p>

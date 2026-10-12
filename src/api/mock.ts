@@ -491,15 +491,22 @@ export const registrationApi = {
     experience: string
     motivation?: string
     consent: boolean
+    password: string
   }): Promise<Registration> {
     if (!input.fullName.trim()) return fail('Nama lengkap wajib diisi.')
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) return fail('Format email tidak valid.')
+    if (input.password.length < 8) return fail('Password minimal 8 karakter.')
     if (!input.consent) return fail('Persetujuan pemrosesan data pribadi wajib dicentang.')
     return delay(
       mutate((db) => {
         const created: Registration = {
           id: uid('r'),
-          ...input,
+          fullName: input.fullName,
+          email: input.email,
+          phone: input.phone,
+          experience: input.experience,
+          motivation: input.motivation,
+          consent: input.consent,
           status: 'baru',
           submittedAt: new Date().toISOString(),
         }

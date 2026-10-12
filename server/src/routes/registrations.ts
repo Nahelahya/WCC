@@ -5,6 +5,7 @@ import { ApiError } from '../lib/errors'
 import { wrap } from '../lib/async'
 import { mapRegistration, type RegistrationRow } from '../lib/mappers'
 import { newId } from '../lib/ids'
+import { hashPassword } from '../lib/password'
 import { sendMail } from '../lib/mailer'
 import { emailVerifyOtpEmail, registrationDecisionEmail, registrationReceivedEmail } from '../lib/emails'
 import { generateOtp, hashOtp } from '../lib/otp'
@@ -20,6 +21,7 @@ const submitSchema = z.object({
   phone: z.string().trim().min(1, 'Nomor kontak wajib diisi.'),
   experience: z.string().trim().min(1, 'Pengalaman wajib diisi.'),
   motivation: z.string().optional(),
+  password: z.string().min(8, 'Password minimal 8 karakter.'),
   consent: z
     .boolean()
     .refine((v) => v === true, 'Persetujuan pemrosesan data pribadi wajib dicentang.'),
@@ -30,10 +32,19 @@ registrationRouter.post(
   wrap(async (req, res) => {
     const input = submitSchema.parse(req.body ?? {})
     const { rows } = await query<RegistrationRow>(
-      `insert into registrations (id, full_name, email, phone, experience, motivation, consent, status, submitted_at)
-       values ($1,$2,$3,$4,$5,$6,true,'baru', now())
+      `insert into registrations
+         (id, full_name, email, phone, experience, motivation, consent, password_hash, status, submitted_at)
+       values ($1,$2,$3,$4,$5,$6,true,$7,'baru', now())
        returning *`,
-      [newId('r'), input.fullName, input.email, input.phone, input.experience, input.motivation ?? null],
+      [
+        newId('r'),
+        input.fullName,
+        input.email,
+        input.phone,
+        input.experience,
+        input.motivation ?? null,
+        await hashPassword(input.password),
+      ],
     )
     // Kirim email konfirmasi & OTP verifikasi email
     void sendMail(registrationReceivedEmail(rows[0].email, rows[0].full_name)).catch((err: unknown) =>
@@ -108,6 +119,35 @@ registrationRouter.get(
   }),
 )
 
+/**
+ * Membuat akun anggota dari pendaftaran yang diverifikasi.
+ *
+ * Memakai password (hash) yang dipilih calon anggota saat mendaftar, sehingga
+ * begitu verifikasi disetujui mereka bisa langsung masuk tanpa dibuat manual.
+ * Dilewati bila email sudah punya akun, atau bila pendaftaran lama tanpa password.
+ */
+async function provisionMemberAccount(reg: RegistrationRow): Promise<void> {
+  if (!reg.password_hash) return
+  try {
+    const { rows } = await query<{ id: string }>(
+      'select id from users where lower(email) = lower($1) limit 1',
+      [reg.email],
+    )
+    if (rows[0]) return
+
+    await query(
+      `insert into users
+         (id, name, email, role, phone, membership_status, password_hash, joined_at, created_at, updated_at)
+       values ($1,$2,$3,'anggota',$4,'aktif',$5, current_date, now(), now())`,
+      [newId('u'), reg.full_name, reg.email, reg.phone || null, reg.password_hash],
+    )
+  } catch (error) {
+    // Verifikasi tetap berhasil walau pembuatan akun gagal; pengurus dapat
+    // membuat akun manual lewat menu Pengguna bila perlu.
+    console.error('Gagal membuat akun anggota dari pendaftaran:', error)
+  }
+}
+
 registrationRouter.patch(
   '/:id/status',
   requireAuth,
@@ -132,8 +172,15 @@ registrationRouter.patch(
     )
     if (!rows[0]) throw ApiError.notFound('Pendaftaran tidak ditemukan.')
 
-    // Kirim email keputusan hanya bila status benar-benar berubah ke hasil final.
     const changed = previous[0]?.status !== rows[0].status
+
+    // Saat diverifikasi: buat akun anggota otomatis memakai password yang
+    // dipilih calon anggota saat mendaftar, agar bisa langsung masuk (login).
+    if (rows[0].status === 'diverifikasi' && changed) {
+      await provisionMemberAccount(rows[0])
+    }
+
+    // Kirim email keputusan hanya bila status benar-benar berubah ke hasil final.
     if ((rows[0].status === 'diverifikasi' || rows[0].status === 'ditolak') && changed) {
       void sendMail(
         registrationDecisionEmail(rows[0].email, rows[0].full_name, rows[0].status, rows[0].internal_note ?? undefined),

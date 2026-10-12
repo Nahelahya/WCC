@@ -322,6 +322,7 @@ export const registrationApi = {
     experience: string
     motivation?: string
     consent: boolean
+    password: string
   }): Promise<Registration> {
     return request('/registrations', { method: 'POST', body: JSON.stringify(input) })
   },

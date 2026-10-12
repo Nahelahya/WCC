@@ -150,7 +150,7 @@ export function registrationDecisionEmail(
       ? 'Selamat! Pendaftaran Anda sebagai anggota WISANGGENI CLIMBING CLUB telah DIVERIFIKASI.'
       : 'Terima kasih atas minat Anda bergabung dengan WISANGGENI CLIMBING CLUB.',
     verified
-      ? 'Akun Anda akan segera diaktifkan. Silakan hubungi pengurus untuk informasi akun masuk.'
+      ? `Akun Anda sudah aktif. Silakan masuk di ${env.publicAppUrl}/masuk menggunakan email dan password yang Anda pilih saat mendaftar.`
       : 'Setelah ditinjau, pendaftaran Anda belum dapat kami setujui saat ini.',
   ]
   if (note) lines.push('', `Catatan dari pengurus: ${note}`)
@@ -161,6 +161,7 @@ export function registrationDecisionEmail(
     <div style="font-family:Inter,Arial,sans-serif;color:#1d2b28;line-height:1.6;max-width:560px">
       <p>${greetingHtml(fullName)}</p>
       <p>${verified ? 'Selamat! Pendaftaran Anda sebagai anggota <strong>WISANGGENI CLIMBING CLUB</strong> telah <strong>diverifikasi</strong>.' : 'Setelah ditinjau, pendaftaran Anda belum dapat kami setujui saat ini.'}</p>
+      ${verified ? `<p>Akun Anda sudah <strong>aktif</strong>. Silakan <a href="${env.publicAppUrl}/masuk" style="color:#173F35;font-weight:600">masuk di sini</a> menggunakan email dan password yang Anda pilih saat mendaftar.</p>` : ''}
       ${note ? `<p><strong>Catatan dari pengurus:</strong> ${escapeHtml(note)}</p>` : ''}
       <p>${signatureHtml()}</p>
     </div>`

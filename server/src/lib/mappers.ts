@@ -178,6 +178,8 @@ export interface RegistrationRow extends QueryResultRow {
   status: RegistrationStatus
   submitted_at: Date | string
   internal_note: string | null
+  /** Hash bcrypt password pilihan calon anggota (dipakai saat akun dibuat otomatis). */
+  password_hash?: string | null
 }
 
 export function mapRegistration(row: RegistrationRow) {
