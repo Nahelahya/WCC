@@ -56,11 +56,16 @@
     @apply mb-1.5 block text-sm font-medium text-ink;
   }
 
+  /* Penting: font-size minimal 16px agar iOS Safari (iPhone/iPad) TIDAK
+     memperbesar halaman secara otomatis saat kolom difokuskan. Auto-zoom ini
+     membuat tampilan ter-zoom dan mengetik terasa tidak nyaman. */
   .field-input {
-    @apply w-full rounded-control border border-line bg-surface px-3 py-2.5 text-[15px] text-ink
+    @apply w-full rounded-control border border-line bg-surface px-3 py-2.5 text-base text-ink
       placeholder:text-muted/70 transition-colors duration-ui
       focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20
       disabled:cursor-not-allowed disabled:bg-bg disabled:text-muted;
+    font-size: 16px;
+    touch-action: manipulation;
   }
 
   .field-input-error {
