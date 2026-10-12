@@ -16,11 +16,20 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, description, children, footer, size = 'md' }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+
+  // Keep the latest onClose in a ref so the effect below only depends on `open`.
+  // Otherwise an inline `onClose` (new identity each render) would make the
+  // effect re-run on every parent render — and each keystroke re-renders the
+  // parent — stealing focus back to the panel after every character.
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     document.addEventListener('keydown', onKey)
     const previous = document.body.style.overflow
@@ -30,7 +39,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = previous
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 
