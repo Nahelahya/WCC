@@ -1,4 +1,4 @@
-import type { Attendance, User } from '@/types'
+import type { Attendance, Role, User } from '@/types'
 
 /**
  * Tipe yang dipakai bersama oleh klien mock (`mock.ts`) dan klien API asli
@@ -8,6 +8,30 @@ import type { Attendance, User } from '@/types'
 export interface AuthSession {
   token: string
   user: User
+}
+
+/** Muatan pembuatan akun pengguna (anggota / coach / pengurus) oleh pengurus. */
+export interface CreateUserInput {
+  name: string
+  email: string
+  password: string
+  role: Role
+  phone?: string
+  photoUrl?: string
+  membershipStatus?: 'aktif' | 'nonaktif' | 'pending'
+  /** Wajib untuk peran `coach`; opsional sebagai penautan untuk `anggota`. */
+  coachId?: string
+}
+
+/** Perubahan akun oleh pengurus (termasuk peran & penautan coach). */
+export interface UpdateUserAccountInput {
+  name?: string
+  email?: string
+  phone?: string
+  photoUrl?: string
+  role?: Role
+  membershipStatus?: 'aktif' | 'nonaktif' | 'pending'
+  coachId?: string
 }
 
 export interface SessionInput {

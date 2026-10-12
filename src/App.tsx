@@ -20,6 +20,7 @@ import { ReportsPage } from '@/pages/app/admin/ReportsPage'
 import { SyncPage } from '@/pages/app/admin/SyncPage'
 import { AuditLogPage } from '@/pages/app/admin/AuditLogPage'
 import { LandingSettingsPage } from '@/pages/app/admin/LandingSettingsPage'
+import { UsersPage } from '@/pages/app/admin/UsersPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 export function App() {
@@ -50,6 +51,7 @@ export function App() {
         <Route path="pengumuman/:id" element={<AnnouncementDetailPage />} />
         <Route path="coach" element={<CoachAdminPage />} />
         <Route path="pendaftaran" element={<RegistrationsPage />} />
+        <Route path="pengguna" element={<UsersPage />} />
         <Route path="kas" element={<TreasuryPage />} />
         <Route path="laporan" element={<ReportsPage />} />
         <Route path="sinkronisasi" element={<SyncPage />} />

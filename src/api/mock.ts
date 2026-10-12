@@ -6,6 +6,7 @@ import type {
   Database,
   Registration,
   RegistrationStatus,
+  Role,
   Session,
   Transaction,
   User,
@@ -13,7 +14,15 @@ import type {
 import { createSeedDatabase, DB_KEY, DB_VERSION, refreshDemoDates } from '@/data/seed'
 import { todayISO } from '@/lib/date'
 import { canCheckIn } from '@/lib/session'
-import type { AttendanceRow, AuthSession, SessionInput, TreasurySummary, UploadResult } from './types'
+import type {
+  AttendanceRow,
+  AuthSession,
+  CreateUserInput,
+  SessionInput,
+  TreasurySummary,
+  UpdateUserAccountInput,
+  UploadResult,
+} from './types'
 
 /**
  * Lapisan API tiruan (mock) untuk prototype.
@@ -171,6 +180,36 @@ export const userApi = {
   async list(): Promise<User[]> {
     return delay(read().users.filter((u) => u.role === 'anggota'))
   },
+  async listByRole(role: Role): Promise<User[]> {
+    return delay(read().users.filter((u) => u.role === role))
+  },
+  async create(input: CreateUserInput): Promise<User> {
+    if (!input.name.trim()) return fail('Nama wajib diisi.')
+    if (!input.email.trim()) return fail('Email wajib diisi.')
+    if (input.password.length < 8) return fail('Password minimal 8 karakter.')
+    if (input.role === 'coach' && !input.coachId) return fail('Pilih profil coach untuk akun ini.')
+    const db = read()
+    if (db.users.some((u) => u.email.toLowerCase() === input.email.trim().toLowerCase())) {
+      return fail('Email sudah terdaftar.')
+    }
+    return delay(
+      mutate((d) => {
+        const created: User = {
+          id: uid('u'),
+          name: input.name,
+          email: input.email,
+          role: input.role,
+          phone: input.phone,
+          photoUrl: input.photoUrl,
+          joinedAt: todayISO(),
+          membershipStatus: input.membershipStatus ?? 'aktif',
+          coachId: input.role === 'pengurus' ? undefined : input.coachId || undefined,
+        }
+        d.users.push(created)
+        return created
+      }),
+    )
+  },
   async updateProfile(
     userId: string,
     patch: Partial<Pick<User, 'name' | 'phone' | 'email' | 'photoUrl'>>,
@@ -184,10 +223,29 @@ export const userApi = {
       }),
     )
   },
+  async updateAccount(userId: string, patch: UpdateUserAccountInput): Promise<User> {
+    return delay(
+      mutate((db) => {
+        const u = db.users.find((x) => x.id === userId)
+        if (!u) throw new Error('Pengguna tidak ditemukan.')
+        Object.assign(u, patch)
+        if (u.role === 'pengurus') u.coachId = undefined
+        return u
+      }),
+    )
+  },
   async changePassword(_userId: string, current: string, next: string): Promise<void> {
-    if (current !== DEMO_PASSWORD) return fail('Password saat ini tidak sesuai.')
+    // `current` kosong berarti pengurus menyetel ulang password pengguna lain.
+    if (current && current !== DEMO_PASSWORD) return fail('Password saat ini tidak sesuai.')
     if (next.length < 8) return fail('Password baru minimal 8 karakter.')
     return delay(undefined)
+  },
+  async remove(userId: string): Promise<void> {
+    return delay(
+      mutate((db) => {
+        db.users = db.users.filter((u) => u.id !== userId)
+      }),
+    )
   },
 }
 

@@ -5,12 +5,21 @@ import type {
   Coach,
   Registration,
   RegistrationStatus,
+  Role,
   Session,
   SyncState,
   Transaction,
   User,
 } from '@/types'
-import type { AttendanceRow, AuthSession, SessionInput, TreasurySummary, UploadResult } from './types'
+import type {
+  AttendanceRow,
+  AuthSession,
+  CreateUserInput,
+  SessionInput,
+  TreasurySummary,
+  UpdateUserAccountInput,
+  UploadResult,
+} from './types'
 import type { LandingContent } from '@/types.landing'
 
 /**
@@ -150,10 +159,25 @@ export const userApi = {
   async list(): Promise<User[]> {
     return request('/users?role=anggota')
   },
+  async listByRole(role: Role): Promise<User[]> {
+    return request(`/users?role=${encodeURIComponent(role)}`)
+  },
+  async create(input: CreateUserInput): Promise<User> {
+    return request('/users', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  },
   async updateProfile(
     userId: string,
     patch: Partial<Pick<User, 'name' | 'phone' | 'email' | 'photoUrl'>>,
   ): Promise<User> {
+    return request(`/users/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    })
+  },
+  async updateAccount(userId: string, patch: UpdateUserAccountInput): Promise<User> {
     return request(`/users/${encodeURIComponent(userId)}`, {
       method: 'PATCH',
       body: JSON.stringify(patch),
@@ -164,6 +188,9 @@ export const userApi = {
       method: 'POST',
       body: JSON.stringify({ current, next }),
     })
+  },
+  async remove(userId: string): Promise<void> {
+    await request(`/users/${encodeURIComponent(userId)}`, { method: 'DELETE' })
   },
 }
 
