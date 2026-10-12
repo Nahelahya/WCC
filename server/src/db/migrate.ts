@@ -3,12 +3,15 @@
  * Runs all SQL files in migrations/ directory in order.
  */
 import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { pool } from './pool'
 
+const currentDir = dirname(fileURLToPath(import.meta.url))
+
 async function migrate() {
-  const migrationsDir = join(__dirname, 'migrations')
-  const files = readdirSync(migrationsigrationsDir)
+  const migrationsDir = join(currentDir, 'migrations')
+  const files = readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.sql'))
     .sort()
 

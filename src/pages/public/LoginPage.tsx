@@ -2,19 +2,13 @@ import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
-import { DEMO_PASSWORD, authApi } from '@/api/client'
+import { authApi } from '@/api/client'
 import { errorMessage } from '@/lib/hooks'
 import { Button } from '@/components/ui/Button'
 import { Checkbox, Input } from '@/components/ui/Field'
 import { Alert } from '@/components/ui/Feedback'
 import { Icon } from '@/components/ui/Icon'
 import { Logo } from '@/components/ui/Logo'
-
-const DEMO_ACCOUNTS = [
-  { role: 'Anggota', email: 'anggota@wcc.id', desc: 'Dashboard, jadwal, check-in absensi' },
-  { role: 'Coach', email: 'coach@wcc.id', desc: 'Sesi yang diampu & daftar hadir' },
-  { role: 'Pengurus', email: 'pengurus@wcc.id', desc: 'Kelola jadwal, absensi, pengumuman, kas' },
-]
 
 export function LoginPage() {
   const { user, login } = useAuth()
@@ -178,42 +172,6 @@ export function LoginPage() {
           <p className="mt-6 text-center text-[12.5px] text-muted">
             Dengan masuk, Anda menyetujui penggunaan data sesuai kebijakan privasi klub.
           </p>
-
-          {/* Akun demo untuk prototype */}
-          <div className="mt-8 rounded-card border border-dashed border-line bg-surface p-4">
-            <p className="flex items-center gap-2 text-[13px] font-semibold text-ink">
-              <Icon name="info" size={16} className="text-info" />
-              Akun demo (prototype)
-            </p>
-            <p className="mt-1 text-[12.5px] text-muted">
-              Password semua akun: <code className="rounded bg-bg px-1.5 py-0.5 font-semibold text-ink">{DEMO_PASSWORD}</code>
-            </p>
-            <ul className="mt-3 space-y-1.5">
-              {DEMO_ACCOUNTS.map((a) => (
-                <li key={a.email}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail(a.email)
-                      setPassword(DEMO_PASSWORD)
-                      setFieldErrors({})
-                      setError(null)
-                    }}
-                    className="flex w-full items-center gap-3 rounded-control border border-line px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-bg"
-                  >
-                    <span className="w-[68px] flex-none text-[12px] font-bold uppercase tracking-wide text-primary">
-                      {a.role}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium text-ink">{a.email}</span>
-                      <span className="block truncate text-[12px] text-muted">{a.desc}</span>
-                    </span>
-                    <Icon name="arrow-right" size={16} className="flex-none text-muted" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
       </div>
     </div>

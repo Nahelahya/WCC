@@ -10,4 +10,4 @@ npx tsx src/db/migrate.ts || true
 
 # Start the server
 echo "Starting WCC API server..."
-exec node dist/index.js
+exec npx tsx src/index.ts

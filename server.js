@@ -1,27 +1,15 @@
 /**
  * Entry point untuk Hostinger Node.js hosting.
- * Menjalankan backend Express dari folder server/ sambil tetap melayani
- * frontend yang di-build di root dist/.
+ *
+ * Menjalankan backend Express (TypeScript, folder `server/src`) memakai `tsx`,
+ * sekaligus melayani frontend hasil build di `dist/` (dilakukan di `server/src/app.ts`).
+ *
+ * Catatan: file ini harus berakhiran `.js` karena Hostinger hanya menerima
+ * entry file berekstensi .js/.mjs/.cjs. Dependency diambil dari `node_modules`
+ * di root proyek (lihat package.json).
  */
-import { spawn } from 'node:child_process'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { register } from 'tsx/esm/api'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const serverDir = path.join(__dirname, 'server')
+register()
 
-const child = spawn('npx', ['tsx', 'src/index.ts'], {
-  cwd: serverDir,
-  stdio: 'inherit',
-  shell: true,
-})
-
-child.on('exit', (code) => {
-  process.exit(code ?? 0)
-})
-
-child.on('error', (error) => {
-  console.error('Gagal menjalankan backend Hostinger:', error)
-  process.exit(1)
-})
+await import('./server/src/index.ts')

@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import express from 'express'
@@ -71,6 +74,18 @@ export function createApp() {
   app.use('/api/landing', landingRouter)
   app.use('/api/sync', syncRouter)
   app.use('/api', dashboardRouter)
+
+  // Sajikan frontend hasil build (dist/) bila ada. Diperlukan saat seluruh
+  // permintaan domain diarahkan ke proses Node.js (mis. Hostinger Node.js),
+  // sehingga rute SPA seperti /masuk tidak dibalas 404.
+  const frontendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist')
+  if (existsSync(path.join(frontendDir, 'index.html'))) {
+    app.use(express.static(frontendDir, { index: false }))
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next()
+      res.sendFile(path.join(frontendDir, 'index.html'))
+    })
+  }
 
   app.use(notFoundHandler)
   app.use(errorHandler)
