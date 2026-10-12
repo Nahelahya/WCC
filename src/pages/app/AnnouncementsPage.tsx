@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { announcementApi } from '@/api/client'
+import { announcementApi, uploadApi } from '@/api/client'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useAsync, errorMessage } from '@/lib/hooks'
@@ -29,9 +29,10 @@ interface FormState {
   body: string
   priority: AnnouncementPriority
   published: boolean
+  imageUrl: string
 }
 
-const EMPTY: FormState = { title: '', summary: '', body: '', priority: 'normal', published: true }
+const EMPTY: FormState = { title: '', summary: '', body: '', priority: 'normal', published: true, imageUrl: '' }
 
 export function AnnouncementsPage() {
   const { user } = useAuth()
@@ -46,6 +47,7 @@ export function AnnouncementsPage() {
   const [form, setForm] = useState<FormState>(EMPTY)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [saving, setSaving] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Announcement | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -75,9 +77,26 @@ export function AnnouncementsPage() {
       body: a.body,
       priority: a.priority,
       published: a.published,
+      imageUrl: a.imageUrl ?? '',
     })
     setErrors({})
     setFormOpen(true)
+  }
+
+  async function onImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploadingImage(true)
+    try {
+      const res = await uploadApi.upload(file)
+      setForm((f) => ({ ...f, imageUrl: res.url }))
+      toast('Gambar pengumuman berhasil diunggah.', 'success')
+    } catch (err) {
+      toast(errorMessage(err), 'error')
+    } finally {
+      setUploadingImage(false)
+    }
   }
 
   async function submit(ev: React.FormEvent) {
@@ -238,6 +257,48 @@ export function AnnouncementsPage() {
                 className="min-h-[180px]"
                 required
               />
+              <div>
+                <span className="field-label">Gambar pengumuman (opsional)</span>
+                <label className="flex cursor-pointer items-center gap-3 rounded-control border border-dashed border-line bg-bg/50 px-3 py-3 text-sm text-muted hover:border-primary/40">
+                  <Icon name="image" size={19} />
+                  <span className="min-w-0 flex-1 truncate">
+                    {uploadingImage
+                      ? 'Mengunggah…'
+                      : form.imageUrl
+                        ? 'Gambar siap dipakai'
+                        : 'Pilih gambar (PNG/JPG/WebP)…'}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    disabled={uploadingImage}
+                    onChange={(e) => void onImageChange(e)}
+                  />
+                  <span className="flex-none rounded-control border border-line bg-surface px-2.5 py-1 text-[12.5px] font-semibold text-ink">
+                    {uploadingImage ? 'Tunggu' : form.imageUrl ? 'Ganti' : 'Pilih'}
+                  </span>
+                </label>
+                {form.imageUrl && (
+                  <div className="mt-2">
+                    <img
+                      src={form.imageUrl}
+                      alt="Pratinjau gambar pengumuman"
+                      className="max-h-52 w-full rounded-control border border-line object-cover"
+                    />
+                    <button
+                      type="button"
+                      className="mt-2 text-[12.5px] text-muted hover:text-danger"
+                      onClick={() => setForm((f) => ({ ...f, imageUrl: '' }))}
+                    >
+                      Hapus gambar
+                    </button>
+                  </div>
+                )}
+                <p className="field-helper">
+                  Gambar akan tampil pada kartu dan halaman pengumuman.
+                </p>
+              </div>
               <Select
                 label="Prioritas"
                 value={form.priority}
@@ -350,6 +411,13 @@ export function AnnouncementDetailPage() {
         </div>
 
         <div className="mt-5 space-y-4 text-[15px] leading-relaxed text-ink/90">
+          {a.imageUrl && (
+            <img
+              src={a.imageUrl}
+              alt=""
+              className="w-full rounded-card border border-line object-cover"
+            />
+          )}
           {a.body.split('\n\n').map((p, i) => (
             <p key={i}>{p}</p>
           ))}

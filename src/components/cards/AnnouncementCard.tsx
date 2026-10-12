@@ -30,6 +30,14 @@ export function AnnouncementCard({ announcement, to, className, showDraft }: Ann
       </div>
       <h3 className="mt-2.5 text-[17px] font-semibold leading-snug text-ink">{announcement.title}</h3>
       <p className="mt-1.5 line-clamp-2 text-sm text-muted">{announcement.summary}</p>
+      {announcement.imageUrl && (
+        <img
+          src={announcement.imageUrl}
+          alt=""
+          loading="lazy"
+          className="mt-3 h-40 w-full rounded-control border border-line object-cover"
+        />
+      )}
       <div className="mt-3 flex items-center gap-2 text-[12.5px] text-muted">
         <Icon name="user" size={14} />
         <span>{announcement.author}</span>

@@ -44,6 +44,8 @@ const announcementSchema = z.object({
   priority: z.enum(['tinggi', 'normal', 'rendah']).optional(),
   published: z.boolean().optional(),
   author: z.string().optional(),
+  /** URL gambar (hasil unggahan). Kirim string kosong untuk menghapus gambar. */
+  imageUrl: z.string().trim().optional(),
 })
 
 announcementRouter.post(
@@ -53,8 +55,8 @@ announcementRouter.post(
   wrap(async (req, res) => {
     const input = announcementSchema.parse(req.body ?? {})
     const { rows } = await query<AnnouncementRow>(
-      `insert into announcements (id, title, summary, body, priority, published, published_at, author)
-       values ($1,$2,$3,$4,$5,$6,now(),$7)
+      `insert into announcements (id, title, summary, body, priority, published, published_at, author, image_url)
+       values ($1,$2,$3,$4,$5,$6,now(),$7,$8)
        returning *`,
       [
         newId('an'),
@@ -64,6 +66,7 @@ announcementRouter.post(
         input.priority ?? 'normal',
         input.published ?? true,
         input.author ?? 'Pengurus WCC',
+        input.imageUrl ? input.imageUrl : null,
       ],
     )
     res.status(201).json(mapAnnouncement(rows[0]))
@@ -83,7 +86,8 @@ announcementRouter.patch(
          body      = coalesce($4, body),
          priority  = coalesce($5, priority),
          published = coalesce($6, published),
-         author    = coalesce($7, author)
+         author    = coalesce($7, author),
+         image_url = case when $8::text is null then image_url else nullif($8::text, '') end
        where id = $1
        returning *`,
       [
@@ -94,6 +98,7 @@ announcementRouter.patch(
         patch.priority ?? null,
         patch.published ?? null,
         patch.author ?? null,
+        patch.imageUrl ?? null,
       ],
     )
     if (!rows[0]) throw ApiError.notFound('Pengumuman tidak ditemukan.')

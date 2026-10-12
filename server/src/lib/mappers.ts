@@ -148,6 +148,7 @@ export interface AnnouncementRow extends QueryResultRow {
   published_at: Date | string
   author: string
   published: boolean
+  image_url: string | null
 }
 
 export function mapAnnouncement(row: AnnouncementRow) {
@@ -160,6 +161,7 @@ export function mapAnnouncement(row: AnnouncementRow) {
     publishedAt: row.published_at instanceof Date ? row.published_at.toISOString() : String(row.published_at),
     author: row.author,
     published: row.published,
+    imageUrl: row.image_url ?? undefined,
   }
 }
 

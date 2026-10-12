@@ -44,6 +44,7 @@ export interface Announcement {
   publishedAt: string // ISO datetime
   author: string
   published: boolean
+  imageUrl?: string
 }
 
 export interface Coach {

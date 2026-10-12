@@ -410,6 +410,7 @@ export const announcementApi = {
           published: input.published ?? true,
           publishedAt: new Date().toISOString(),
           author: input.author ?? 'Pengurus WCC',
+          imageUrl: input.imageUrl || undefined,
         }
         db.announcements.push(created)
         return created
