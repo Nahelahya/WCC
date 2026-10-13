@@ -33,6 +33,19 @@ export const env = {
   /** Email pengurus yang menerima notifikasi pendaftaran baru (opsional). */
   registrationNotifyEmail: process.env.REGISTRATION_NOTIFY_EMAIL ?? '',
 
+  /**
+   * Alternatif pengiriman email lewat Hostinger Mail API (HTTP) alih-alih SMTP.
+   * Bila `HOSTINGER_MAIL_API_TOKEN` diisi, mode ini dipakai (lihat lib/mailer.ts).
+   * Token dibuat di hPanel → Email → Agentic Mail → API access.
+   */
+  hostingerMailApiToken: process.env.HOSTINGER_MAIL_API_TOKEN ?? '',
+  hostingerMailApiUrl: (process.env.HOSTINGER_MAIL_API_URL ?? 'https://api.mail.hostinger.com').replace(
+    /\/+$/,
+    '',
+  ),
+  /** Resource ID kotak surat (mis. `AC…`). Bila kosong, diambil otomatis dari `GET /api/v1/me`. */
+  hostingerMailMailboxId: process.env.HOSTINGER_MAIL_MAILBOX_ID ?? '',
+
   // ---- Penyimpanan berkas (unggahan) ----
   uploadDir: process.env.UPLOAD_DIR ?? 'uploads',
   uploadMaxMb: Number(process.env.UPLOAD_MAX_MB ?? 5),
