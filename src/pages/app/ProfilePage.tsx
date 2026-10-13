@@ -7,7 +7,7 @@ import { useAsync, errorMessage } from '@/lib/hooks'
 import { PageHeader, SectionHeader } from '@/components/layout/PageHeader'
 import { StatCard } from '@/components/cards/StatCard'
 import { Button, buttonClasses } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Field'
+import { Input, Select, Textarea } from '@/components/ui/Field'
 import { Alert, EmptyState, ListSkeleton } from '@/components/ui/Feedback'
 import { ConfirmDialog } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
@@ -24,7 +24,19 @@ export function ProfilePage() {
   const [name, setName] = useState(user!.name)
   const [phone, setPhone] = useState(user!.phone ?? '')
   const [email, setEmail] = useState(user!.email)
-  const [profileErrors, setProfileErrors] = useState<{ name?: string; email?: string; phone?: string }>({})
+  const [gender, setGender] = useState<'L' | 'P' | ''>(user!.gender ?? '')
+  const [nik, setNik] = useState(user!.nik ?? '')
+  const [address, setAddress] = useState(user!.address ?? '')
+  const [medicalHistory, setMedicalHistory] = useState(user!.medicalHistory ?? '')
+  const [parentName, setParentName] = useState(user!.parentName ?? '')
+  const [parentPhone, setParentPhone] = useState(user!.parentPhone ?? '')
+  const [profileErrors, setProfileErrors] = useState<{
+    name?: string
+    email?: string
+    phone?: string
+    nik?: string
+    parentPhone?: string
+  }>({})
   const [savingProfile, setSavingProfile] = useState(false)
 
   const [current, setCurrent] = useState('')
@@ -48,12 +60,25 @@ export function ProfilePage() {
     if (!name.trim()) errs.name = 'Nama wajib diisi.'
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Format email tidak valid.'
     if (phone && phone.replace(/\D/g, '').length < 9) errs.phone = 'Nomor kontak terlalu pendek.'
+    if (nik && !/^\d{16}$/.test(nik.trim())) errs.nik = 'NIK KTP harus tepat 16 digit angka.'
+    if (parentPhone && parentPhone.replace(/\D/g, '').length < 9)
+      errs.parentPhone = 'Kontak orang tua/wali terlalu pendek.'
     setProfileErrors(errs)
     if (Object.keys(errs).length) return
 
     setSavingProfile(true)
     try {
-      const updated = await userApi.updateProfile(user!.id, { name, phone, email })
+      const updated = await userApi.updateProfile(user!.id, {
+        name,
+        phone,
+        email,
+        gender: gender || undefined,
+        nik,
+        address,
+        medicalHistory,
+        parentName,
+        parentPhone,
+      })
       setUser(updated)
       toast('Perubahan berhasil disimpan.', 'success')
     } catch (err) {
@@ -217,7 +242,7 @@ export function ProfilePage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Edit profil */}
         <section>
-          <SectionHeader title="Informasi dasar" description="Nama, email, dan nomor kontak Anda." />
+          <SectionHeader title="Informasi dasar" description="Nama, email, nomor kontak, dan data identitas Anda." />
           <form onSubmit={saveProfile} className="card space-y-4 p-4 sm:p-5" noValidate>
             <Input
               label="Nama lengkap"
@@ -243,6 +268,59 @@ export function ProfilePage() {
               error={profileErrors.phone}
               placeholder="0812-3456-7890"
             />
+            {user!.role === 'anggota' && (
+              <div className="space-y-4 border-t border-line pt-4">
+                <p className="text-[12.5px] font-semibold uppercase tracking-wide text-muted">
+                  Data identitas &amp; kesehatan
+                </p>
+                <Select
+                  label="Jenis kelamin"
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value as 'L' | 'P' | '')}
+                >
+                  <option value="">Belum diisi</option>
+                  <option value="L">Laki-laki (L)</option>
+                  <option value="P">Perempuan (P)</option>
+                </Select>
+                <Input
+                  label="NIK KTP"
+                  inputMode="numeric"
+                  maxLength={16}
+                  value={nik}
+                  onChange={(e) => setNik(e.target.value.replace(/\D/g, ''))}
+                  error={profileErrors.nik}
+                  placeholder="16 digit sesuai KTP"
+                  helper="Wajib 16 digit angka sesuai KTP."
+                />
+                <Textarea
+                  label="Alamat lengkap"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Jalan, nomor, RT/RW, kelurahan, kecamatan, kota/kabupaten."
+                />
+                <Textarea
+                  label="Riwayat penyakit"
+                  value={medicalHistory}
+                  onChange={(e) => setMedicalHistory(e.target.value)}
+                  placeholder="Misalnya: asma, cedera lutut, atau tulis '-' jika tidak ada."
+                  helper="Tulis '-' bila tidak memiliki riwayat penyakit/cedera."
+                />
+                <Input
+                  label="Nama orang tua/wali"
+                  value={parentName}
+                  onChange={(e) => setParentName(e.target.value)}
+                  placeholder="Nama lengkap orang tua/wali"
+                />
+                <Input
+                  label="Kontak orang tua/wali"
+                  type="tel"
+                  value={parentPhone}
+                  onChange={(e) => setParentPhone(e.target.value)}
+                  error={profileErrors.parentPhone}
+                  placeholder="0812-3456-7890"
+                />
+              </div>
+            )}
             <div className="border-t border-line pt-4">
               <Button type="submit" loading={savingProfile} icon="check">
                 Simpan Perubahan

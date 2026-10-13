@@ -105,6 +105,17 @@ const profileSchema = z.object({
   phone: z.string().trim().max(40, 'Nomor kontak terlalu panjang.').optional(),
   email: z.string().trim().email('Format email tidak valid.').optional(),
   photoUrl: z.string().optional(),
+  // Data identitas anggota — boleh diisi/diperbarui sendiri oleh pemilik akun.
+  gender: z.enum(['L', 'P', '']).optional(),
+  nik: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^\d{16}$/.test(v), 'NIK KTP harus tepat 16 digit angka.')
+    .optional(),
+  address: z.string().trim().max(500, 'Alamat terlalu panjang.').optional(),
+  medicalHistory: z.string().trim().max(1000, 'Riwayat penyakit terlalu panjang.').optional(),
+  parentName: z.string().trim().max(120, 'Nama orang tua/wali terlalu panjang.').optional(),
+  parentPhone: z.string().trim().max(40, 'Kontak orang tua/wali terlalu panjang.').optional(),
   // Hanya pengurus yang boleh mengubah tiga bidang di bawah ini.
   role: z.enum(['anggota', 'coach', 'pengurus']).optional(),
   membershipStatus: z.enum(['aktif', 'nonaktif', 'pending']).optional(),
@@ -142,6 +153,12 @@ userRouter.patch(
            role              = $6,
            membership_status = $7,
            coach_id          = $8,
+           gender            = $9,
+           nik               = $10,
+           address           = $11,
+           medical_history   = $12,
+           parent_name       = $13,
+           parent_phone      = $14,
            updated_at        = now()
          where id = $1
          returning *`,
@@ -154,6 +171,12 @@ userRouter.patch(
           role,
           membership,
           coachId,
+          patch.gender === undefined ? current.gender : patch.gender || null,
+          patch.nik === undefined ? current.nik : patch.nik || null,
+          patch.address === undefined ? current.address : patch.address || null,
+          patch.medicalHistory === undefined ? current.medical_history : patch.medicalHistory || null,
+          patch.parentName === undefined ? current.parent_name : patch.parentName || null,
+          patch.parentPhone === undefined ? current.parent_phone : patch.parentPhone || null,
         ],
       )
       res.json(mapUser(rows[0]))

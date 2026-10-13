@@ -212,7 +212,9 @@ export const userApi = {
   },
   async updateProfile(
     userId: string,
-    patch: Partial<Pick<User, 'name' | 'phone' | 'email' | 'photoUrl'>>,
+    patch: Partial<
+      Pick<User, 'name' | 'phone' | 'email' | 'photoUrl' | 'gender' | 'nik' | 'address' | 'medicalHistory' | 'parentName' | 'parentPhone'>
+    >,
   ): Promise<User> {
     return delay(
       mutate((db) => {
