@@ -4,7 +4,7 @@ import { registrationApi } from '@/api/client'
 import { errorMessage } from '@/lib/hooks'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button, buttonClasses } from '@/components/ui/Button'
-import { Checkbox, Input, Textarea } from '@/components/ui/Field'
+import { Checkbox, Input, Select, Textarea } from '@/components/ui/Field'
 import { Alert } from '@/components/ui/Feedback'
 import { Icon } from '@/components/ui/Icon'
 import { StatusBadge, REGISTRATION_LABEL, REGISTRATION_TONE } from '@/components/ui/StatusBadge'
@@ -17,6 +17,12 @@ interface FormState {
   password: string
   confirmPassword: string
   phone: string
+  gender: '' | 'L' | 'P'
+  nik: string
+  address: string
+  medicalHistory: string
+  parentName: string
+  parentPhone: string
   experience: string
   motivation: string
   consent: boolean
@@ -28,6 +34,12 @@ const EMPTY: FormState = {
   password: '',
   confirmPassword: '',
   phone: '',
+  gender: '',
+  nik: '',
+  address: '',
+  medicalHistory: '',
+  parentName: '',
+  parentPhone: '',
   experience: '',
   motivation: '',
   consent: false,
@@ -56,6 +68,14 @@ export function RegisterPage() {
     else if (form.confirmPassword !== form.password) e.confirmPassword = 'Konfirmasi password tidak sama.'
     if (!form.phone.trim()) e.phone = 'Nomor kontak wajib diisi.'
     else if (form.phone.replace(/\D/g, '').length < 9) e.phone = 'Nomor kontak terlalu pendek.'
+    if (!form.gender) e.gender = 'Jenis kelamin wajib dipilih.'
+    if (!form.nik.trim()) e.nik = 'NIK KTP wajib diisi.'
+    else if (!/^\d{16}$/.test(form.nik.trim())) e.nik = 'NIK KTP harus tepat 16 digit angka.'
+    if (!form.address.trim()) e.address = 'Alamat wajib diisi.'
+    if (!form.medicalHistory.trim()) e.medicalHistory = 'Riwayat penyakit wajib diisi (tulis "-" jika tidak ada).'
+    if (!form.parentName.trim()) e.parentName = 'Nama orang tua/wali wajib diisi.'
+    if (!form.parentPhone.trim()) e.parentPhone = 'Kontak orang tua/wali wajib diisi.'
+    else if (form.parentPhone.replace(/\D/g, '').length < 9) e.parentPhone = 'Kontak orang tua/wali terlalu pendek.'
     if (!form.experience.trim()) e.experience = 'Ceritakan pengalaman Anda (isi "-" jika belum pernah).'
     if (!form.consent) e.consent = 'Persetujuan pemrosesan data pribadi wajib dicentang.'
     setErrors(e)
@@ -72,6 +92,12 @@ export function RegisterPage() {
         fullName: form.fullName,
         email: form.email,
         phone: form.phone,
+        gender: form.gender as 'L' | 'P',
+        nik: form.nik.trim(),
+        address: form.address,
+        medicalHistory: form.medicalHistory,
+        parentName: form.parentName,
+        parentPhone: form.parentPhone,
         experience: form.experience,
         motivation: form.motivation,
         consent: form.consent,
@@ -212,16 +238,81 @@ export function RegisterPage() {
             />
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label="Nomor kontak"
+              type="tel"
+              value={form.phone}
+              onChange={(e) => set('phone', e.target.value)}
+              error={errors.phone}
+              placeholder="0812-3456-7890"
+              autoComplete="tel"
+              required
+            />
+            <Select
+              label="Jenis kelamin"
+              value={form.gender}
+              onChange={(e) => set('gender', e.target.value as FormState['gender'])}
+              error={errors.gender}
+              required
+            >
+              <option value="">Pilih…</option>
+              <option value="L">Laki-laki (L)</option>
+              <option value="P">Perempuan (P)</option>
+            </Select>
+          </div>
+
           <Input
-            label="Nomor kontak"
-            type="tel"
-            value={form.phone}
-            onChange={(e) => set('phone', e.target.value)}
-            error={errors.phone}
-            placeholder="0812-3456-7890"
-            autoComplete="tel"
+            label="Nomor identitas / NIK KTP"
+            inputMode="numeric"
+            maxLength={16}
+            value={form.nik}
+            onChange={(e) => set('nik', e.target.value.replace(/\D/g, ''))}
+            error={errors.nik}
+            placeholder="16 digit sesuai KTP"
+            helper="Wajib 16 digit angka sesuai KTP."
             required
           />
+
+          <Textarea
+            label="Alamat lengkap"
+            value={form.address}
+            onChange={(e) => set('address', e.target.value)}
+            error={errors.address}
+            placeholder="Jalan, nomor, RT/RW, kelurahan, kecamatan, kota/kabupaten."
+            required
+          />
+
+          <Textarea
+            label="Riwayat penyakit"
+            value={form.medicalHistory}
+            onChange={(e) => set('medicalHistory', e.target.value)}
+            error={errors.medicalHistory}
+            placeholder="Misalnya: asma, cedera lutut, atau tulis '-' jika tidak ada."
+            helper="Tulis '-' bila tidak memiliki riwayat penyakit/cedera."
+            required
+          />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label="Nama orang tua/wali"
+              value={form.parentName}
+              onChange={(e) => set('parentName', e.target.value)}
+              error={errors.parentName}
+              placeholder="Nama lengkap orang tua/wali"
+              required
+            />
+            <Input
+              label="Kontak orang tua/wali"
+              type="tel"
+              value={form.parentPhone}
+              onChange={(e) => set('parentPhone', e.target.value)}
+              error={errors.parentPhone}
+              placeholder="0812-3456-7890"
+              autoComplete="tel"
+              required
+            />
+          </div>
 
           <Textarea
             label="Pengalaman panjat tebing"

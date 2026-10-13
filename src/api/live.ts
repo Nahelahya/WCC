@@ -319,6 +319,12 @@ export const registrationApi = {
     fullName: string
     email: string
     phone: string
+    gender: 'L' | 'P'
+    nik: string
+    address: string
+    medicalHistory: string
+    parentName: string
+    parentPhone: string
     experience: string
     motivation?: string
     consent: boolean

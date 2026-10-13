@@ -19,6 +19,20 @@ const submitSchema = z.object({
   fullName: z.string().trim().min(1, 'Nama lengkap wajib diisi.'),
   email: z.string().trim().email('Format email tidak valid.'),
   phone: z.string().trim().min(1, 'Nomor kontak wajib diisi.'),
+  gender: z.enum(['L', 'P'], {
+    errorMap: () => ({ message: 'Jenis kelamin wajib dipilih (L/P).' }),
+  }),
+  nik: z
+    .string()
+    .trim()
+    .regex(/^\d{16}$/, 'NIK KTP harus tepat 16 digit angka.'),
+  address: z.string().trim().min(1, 'Alamat wajib diisi.'),
+  medicalHistory: z
+    .string()
+    .trim()
+    .min(1, 'Riwayat penyakit wajib diisi (tulis "-" bila tidak ada).'),
+  parentName: z.string().trim().min(1, 'Nama orang tua/wali wajib diisi.'),
+  parentPhone: z.string().trim().min(1, 'Kontak orang tua/wali wajib diisi.'),
   experience: z.string().trim().min(1, 'Pengalaman wajib diisi.'),
   motivation: z.string().optional(),
   password: z.string().min(8, 'Password minimal 8 karakter.'),
@@ -33,14 +47,22 @@ registrationRouter.post(
     const input = submitSchema.parse(req.body ?? {})
     const { rows } = await query<RegistrationRow>(
       `insert into registrations
-         (id, full_name, email, phone, experience, motivation, consent, password_hash, status, submitted_at)
-       values ($1,$2,$3,$4,$5,$6,true,$7,'baru', now())
+         (id, full_name, email, phone, gender, nik, address, medical_history,
+          parent_name, parent_phone, experience, motivation, consent,
+          password_hash, status, submitted_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,$13,'baru', now())
        returning *`,
       [
         newId('r'),
         input.fullName,
         input.email,
         input.phone,
+        input.gender,
+        input.nik,
+        input.address,
+        input.medicalHistory,
+        input.parentName,
+        input.parentPhone,
         input.experience,
         input.motivation ?? null,
         await hashPassword(input.password),

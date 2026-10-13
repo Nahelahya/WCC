@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { authApi } from '@/api/client'
-import { errorMessage } from '@/lib/hooks'
+import { errorMessage, IDLE_LOGOUT_FLAG } from '@/lib/hooks'
 import { Button } from '@/components/ui/Button'
 import { Checkbox, Input } from '@/components/ui/Field'
 import { Alert } from '@/components/ui/Feedback'
@@ -22,6 +22,18 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({})
   const [submitting, setSubmitting] = useState(false)
+  const [idleNotice, setIdleNotice] = useState(false)
+
+  useEffect(() => {
+    try {
+      if (window.sessionStorage.getItem(IDLE_LOGOUT_FLAG) === '1') {
+        window.sessionStorage.removeItem(IDLE_LOGOUT_FLAG)
+        setIdleNotice(true)
+      }
+    } catch {
+      // sessionStorage diblokir — abaikan.
+    }
+  }, [])
 
   if (user) return <Navigate to="/app" replace />
 
@@ -112,6 +124,12 @@ export function LoginPage() {
             </Link>
             .
           </p>
+
+          {idleNotice && (
+            <Alert tone="info" className="mt-5">
+              Sesi Anda berakhir otomatis karena tidak ada aktivitas selama 30 menit. Silakan masuk kembali.
+            </Alert>
+          )}
 
           {error && (
             <Alert tone="error" className="mt-5">

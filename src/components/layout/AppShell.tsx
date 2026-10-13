@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { useIdleLogout, IDLE_LOGOUT_FLAG } from '@/lib/hooks'
 import { PageLoading, EmptyState } from '@/components/ui/Feedback'
 import { Button, buttonClasses } from '@/components/ui/Button'
 import { Logo } from '@/components/ui/Logo'
@@ -9,9 +10,22 @@ import { ROLE_LABEL, canAccess } from './nav'
 import { Icon } from '@/components/ui/Icon'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
+/** Batas tidak ada aktivitas sebelum sesi diakhiri otomatis (30 menit). */
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000
+
 export function AppShell({ children }: { children?: ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, loading, logout } = useAuth()
   const location = useLocation()
+
+  // Akhiri sesi otomatis bila pengguna tidak beraktivitas.
+  useIdleLogout(IDLE_TIMEOUT_MS, () => {
+    try {
+      window.sessionStorage.setItem(IDLE_LOGOUT_FLAG, '1')
+    } catch {
+      // sessionStorage bisa diblokir; pengalihan ke halaman masuk tetap terjadi.
+    }
+    void logout()
+  })
 
   if (loading) {
     return (

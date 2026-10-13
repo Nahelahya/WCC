@@ -58,12 +58,22 @@ export interface Coach {
 }
 
 export type RegistrationStatus = 'baru' | 'diverifikasi' | 'ditolak'
+export type Gender = 'L' | 'P'
 
 export interface Registration {
   id: string
   fullName: string
   email: string
   phone: string
+  /** Jenis kelamin: L = laki-laki, P = perempuan. */
+  gender?: Gender
+  /** Nomor Induk Kependudukan (NIK) pada KTP, 16 digit. */
+  nik: string
+  address: string
+  /** Riwayat penyakit/cedera; "-" bila tidak ada. */
+  medicalHistory?: string
+  parentName: string
+  parentPhone: string
   experience: string
   motivation?: string
   consent: boolean

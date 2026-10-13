@@ -489,6 +489,12 @@ export const registrationApi = {
     fullName: string
     email: string
     phone: string
+    gender: 'L' | 'P'
+    nik: string
+    address: string
+    medicalHistory: string
+    parentName: string
+    parentPhone: string
     experience: string
     motivation?: string
     consent: boolean
@@ -496,8 +502,9 @@ export const registrationApi = {
   }): Promise<Registration> {
     if (!input.fullName.trim()) return fail('Nama lengkap wajib diisi.')
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) return fail('Format email tidak valid.')
-    if (input.password.length < 8) return fail('Password minimal 8 karakter.')
+    if (!/^\d{16}$/.test(input.nik.trim())) return fail('NIK KTP harus tepat 16 digit angka.')
     if (!input.consent) return fail('Persetujuan pemrosesan data pribadi wajib dicentang.')
+    if (input.password.length < 8) return fail('Password minimal 8 karakter.')
     return delay(
       mutate((db) => {
         const created: Registration = {
@@ -505,6 +512,12 @@ export const registrationApi = {
           fullName: input.fullName,
           email: input.email,
           phone: input.phone,
+          gender: input.gender,
+          nik: input.nik,
+          address: input.address,
+          medicalHistory: input.medicalHistory,
+          parentName: input.parentName,
+          parentPhone: input.parentPhone,
           experience: input.experience,
           motivation: input.motivation,
           consent: input.consent,

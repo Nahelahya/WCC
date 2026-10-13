@@ -174,6 +174,12 @@ export interface RegistrationRow extends QueryResultRow {
   full_name: string
   email: string
   phone: string
+  gender: string | null
+  nik: string | null
+  address: string | null
+  medical_history: string | null
+  parent_name: string | null
+  parent_phone: string | null
   experience: string
   motivation: string | null
   consent: boolean
@@ -190,6 +196,12 @@ export function mapRegistration(row: RegistrationRow) {
     fullName: row.full_name,
     email: row.email,
     phone: row.phone,
+    gender: (row.gender as 'L' | 'P' | null) ?? undefined,
+    nik: row.nik ?? '',
+    address: row.address ?? '',
+    medicalHistory: row.medical_history ?? '',
+    parentName: row.parent_name ?? '',
+    parentPhone: row.parent_phone ?? '',
     experience: row.experience,
     motivation: row.motivation ?? undefined,
     consent: row.consent,

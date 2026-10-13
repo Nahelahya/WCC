@@ -227,6 +227,13 @@ export function RegistrationsPage() {
                 ['Nama lengkap', detail.fullName],
                 ['Email', detail.email],
                 ['Nomor kontak', detail.phone],
+                [
+                  'Jenis kelamin',
+                  detail.gender === 'L' ? 'Laki-laki' : detail.gender === 'P' ? 'Perempuan' : '—',
+                ],
+                ['NIK KTP', detail.nik || '—'],
+                ['Nama orang tua/wali', detail.parentName || '—'],
+                ['Kontak orang tua/wali', detail.parentPhone || '—'],
                 ['Persetujuan data', detail.consent ? 'Disetujui' : 'Belum disetujui'],
               ].map(([k, v]) => (
                 <div key={k} className="rounded-control border border-line bg-bg/50 p-3">
@@ -235,6 +242,16 @@ export function RegistrationsPage() {
                 </div>
               ))}
             </dl>
+
+            <div className="rounded-control border border-line p-3">
+              <p className="text-[12px] text-muted">Alamat lengkap</p>
+              <p className="mt-1 text-sm text-ink">{detail.address || '—'}</p>
+            </div>
+
+            <div className="rounded-control border border-line p-3">
+              <p className="text-[12px] text-muted">Riwayat penyakit</p>
+              <p className="mt-1 text-sm text-ink">{detail.medicalHistory || '—'}</p>
+            </div>
 
             <div className="rounded-control border border-line p-3">
               <p className="text-[12px] text-muted">Pengalaman panjat tebing</p>

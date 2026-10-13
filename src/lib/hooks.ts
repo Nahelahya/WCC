@@ -63,6 +63,51 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
 }
 
+/**
+ * Penanda di sessionStorage bahwa sesi terakhir berakhir karena pengguna
+ * tidak beraktivitas (dibaca halaman masuk untuk menampilkan pemberitahuan).
+ */
+export const IDLE_LOGOUT_FLAG = 'wcc_idle_logout'
+
+/**
+ * Memanggil `onIdle` setelah tidak ada aktivitas pengguna selama `timeoutMs`.
+ *
+ * Aktivitas yang dihitung: gerakan/klik mouse, ketikan keyboard, gulir, dan
+ * sentuhan layar. Pemeriksaan dilakukan berkala sehingga tetap berjalan walau
+ * tab sempat tidak aktif (browser menahan timer di latar belakang).
+ */
+export function useIdleLogout(timeoutMs: number, onIdle: () => void) {
+  const onIdleRef = useRef(onIdle)
+  onIdleRef.current = onIdle
+
+  useEffect(() => {
+    let last = Date.now()
+    const markActive = () => {
+      last = Date.now()
+    }
+    const check = () => {
+      if (Date.now() - last >= timeoutMs) onIdleRef.current()
+    }
+
+    const events: Array<keyof WindowEventMap> = [
+      'mousemove',
+      'mousedown',
+      'keydown',
+      'scroll',
+      'wheel',
+      'touchstart',
+      'click',
+    ]
+    events.forEach((name) => window.addEventListener(name, markActive, { passive: true }))
+    const interval = window.setInterval(check, 30_000)
+
+    return () => {
+      window.clearInterval(interval)
+      events.forEach((name) => window.removeEventListener(name, markActive))
+    }
+  }, [timeoutMs])
+}
+
 /** Menjalankan aksi important sekali saja selama masih berjalan (cegah submit ganda). */
 export function useSubmitting() {
   const [submitting, setSubmitting] = useState(false)
