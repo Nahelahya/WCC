@@ -21,6 +21,13 @@ export interface UserRow extends QueryResultRow {
   joined_at: string
   membership_status: string | null
   coach_id: string | null
+  /** Data profil yang disalin dari pendaftaran saat akun anggota dibuat. */
+  gender: string | null
+  nik: string | null
+  address: string | null
+  medical_history: string | null
+  parent_name: string | null
+  parent_phone: string | null
   password_hash?: string
 }
 
@@ -35,6 +42,12 @@ export function mapUser(row: UserRow) {
     joinedAt: row.joined_at,
     membershipStatus: row.membership_status ?? undefined,
     coachId: row.coach_id ?? undefined,
+    gender: (row.gender as 'L' | 'P' | null) ?? undefined,
+    nik: row.nik ?? undefined,
+    address: row.address ?? undefined,
+    medicalHistory: row.medical_history ?? undefined,
+    parentName: row.parent_name ?? undefined,
+    parentPhone: row.parent_phone ?? undefined,
   }
 }
 

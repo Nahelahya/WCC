@@ -90,6 +90,7 @@ export function UsersPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [detail, setDetail] = useState<User | null>(null)
 
   const all = users.data ?? []
 
@@ -260,6 +261,9 @@ export function UsersPage() {
       align: 'right',
       render: (u) => (
         <div className="flex justify-end gap-1.5">
+          <Button size="sm" variant="secondary" icon="eye" onClick={() => setDetail(u)}>
+            <span className="sr-only">Lihat data {u.name}</span>
+          </Button>
           <Button size="sm" variant="secondary" icon="edit" onClick={() => openEdit(u)}>
             <span className="sr-only">Ubah {u.name}</span>
           </Button>
@@ -342,6 +346,9 @@ export function UsersPage() {
               <StatusBadge tone={ROLE_TONE[u.role]}>{ROLE_LABEL[u.role]}</StatusBadge>
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
+              <Button size="sm" variant="secondary" icon="eye" onClick={() => setDetail(u)}>
+                Detail
+              </Button>
               <Button size="sm" variant="secondary" icon="edit" onClick={() => openEdit(u)}>
                 Ubah
               </Button>
@@ -502,6 +509,64 @@ export function UsersPage() {
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
         />
+      </Modal>
+
+      {/* Detail data anggota (identitas dari pendaftaran) */}
+      <Modal
+        open={Boolean(detail)}
+        onClose={() => setDetail(null)}
+        title="Detail data anggota"
+        description={detail ? `${detail.name} · ${detail.email}` : undefined}
+        size="lg"
+        footer={
+          <Button variant="secondary" onClick={() => setDetail(null)}>
+            Tutup
+          </Button>
+        }
+      >
+        {detail && (
+          <div className="space-y-3">
+            <dl className="grid gap-3 sm:grid-cols-2">
+              {(
+                [
+                  ['Peran', ROLE_LABEL[detail.role]],
+                  ['Status keanggotaan', MEMBERSHIP_LABEL[(detail.membershipStatus ?? 'aktif') as Membership]],
+                  ['Nomor kontak', detail.phone || '—'],
+                  [
+                    'Jenis kelamin',
+                    detail.gender === 'L' ? 'Laki-laki (L)' : detail.gender === 'P' ? 'Perempuan (P)' : '—',
+                  ],
+                  ['NIK KTP', detail.nik || '—'],
+                  ['Nama orang tua/wali', detail.parentName || '—'],
+                  ['Kontak orang tua/wali', detail.parentPhone || '—'],
+                  ['Bergabung', formatDateID(detail.joinedAt.slice(0, 10))],
+                ] as Array<[string, string]>
+              ).map(([k, v]) => (
+                <div key={k} className="rounded-control border border-line bg-bg/50 p-3">
+                  <dt className="text-[12px] text-muted">{k}</dt>
+                  <dd className="mt-0.5 text-sm font-medium text-ink">{v}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <div className="rounded-control border border-line p-3">
+              <p className="text-[12px] text-muted">Alamat lengkap</p>
+              <p className="mt-1 text-sm text-ink">{detail.address || '—'}</p>
+            </div>
+
+            <div className="rounded-control border border-line p-3">
+              <p className="text-[12px] text-muted">Riwayat penyakit</p>
+              <p className="mt-1 text-sm text-ink">{detail.medicalHistory || '—'}</p>
+            </div>
+
+            {detail.role !== 'anggota' && (
+              <Alert tone="info">
+                Data identitas (NIK, alamat, riwayat penyakit, dan data orang tua) hanya terisi untuk akun anggota yang
+                berasal dari pendaftaran.
+              </Alert>
+            )}
+          </div>
+        )}
       </Modal>
 
       <ConfirmDialog

@@ -159,9 +159,22 @@ async function provisionMemberAccount(reg: RegistrationRow): Promise<void> {
 
     await query(
       `insert into users
-         (id, name, email, role, phone, membership_status, password_hash, joined_at, created_at, updated_at)
-       values ($1,$2,$3,'anggota',$4,'aktif',$5, current_date, now(), now())`,
-      [newId('u'), reg.full_name, reg.email, reg.phone || null, reg.password_hash],
+         (id, name, email, role, phone, gender, nik, address, medical_history,
+          parent_name, parent_phone, membership_status, password_hash, joined_at, created_at, updated_at)
+       values ($1,$2,$3,'anggota',$4,$5,$6,$7,$8,$9,$10,'aktif',$11, current_date, now(), now())`,
+      [
+        newId('u'),
+        reg.full_name,
+        reg.email,
+        reg.phone || null,
+        reg.gender || null,
+        reg.nik || null,
+        reg.address || null,
+        reg.medical_history || null,
+        reg.parent_name || null,
+        reg.parent_phone || null,
+        reg.password_hash,
+      ],
     )
   } catch (error) {
     // Verifikasi tetap berhasil walau pembuatan akun gagal; pengurus dapat

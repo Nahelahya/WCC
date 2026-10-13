@@ -11,6 +11,13 @@ export interface User {
   joinedAt: string
   membershipStatus?: 'aktif' | 'nonaktif' | 'pending'
   coachId?: string
+  /** Data profil dari pendaftaran (tersedia untuk akun anggota). */
+  gender?: 'L' | 'P'
+  nik?: string
+  address?: string
+  medicalHistory?: string
+  parentName?: string
+  parentPhone?: string
 }
 
 export interface Session {
