@@ -329,6 +329,18 @@ export const registrationApi = {
   async getByEmail(email: string): Promise<Registration[]> {
     return request(`/registrations/status${query({ email })}`)
   },
+  async verifyOtp(email: string, otp: string): Promise<{ verified: boolean }> {
+    return request('/registrations/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    })
+  },
+  async resendOtp(email: string): Promise<{ message: string }> {
+    return request('/registrations/resend-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    })
+  },
   async submit(input: {
     fullName: string
     email: string

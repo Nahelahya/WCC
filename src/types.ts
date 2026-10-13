@@ -87,6 +87,8 @@ export interface Registration {
   status: RegistrationStatus
   submittedAt: string
   internalNote?: string
+  /** Waktu email pendaftar diverifikasi lewat kode OTP (kosong bila belum). */
+  emailVerifiedAt?: string
 }
 
 export type TransactionType = 'pemasukan' | 'pengeluaran'

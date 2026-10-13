@@ -14,7 +14,12 @@ export function generateOtp(length = 8): string {
   return out
 }
 
-/** Hash OTP sebelum disimpan ke DB (menggunakan skema hash serupa refresh token). */
+/**
+ * Hash OTP sebelum disimpan ke DB (menggunakan skema hash serupa refresh token).
+ *
+ * Kode dinormalisasi (dibersihkan spasi + dijadikan huruf besar) agar
+ * pemeriksaan tidak terpengaruh besar/kecil huruf yang diketik pengguna.
+ */
 export function hashOtp(code: string): string {
-  return hashToken(code)
+  return hashToken(code.trim().toUpperCase())
 }

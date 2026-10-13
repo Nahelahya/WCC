@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { registrationApi } from '@/api/client'
 import { errorMessage } from '@/lib/hooks'
@@ -52,6 +52,23 @@ export function RegisterPage() {
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<Registration | null>(null)
 
+  // Alur setelah kirim: `form` -> `otp` (verifikasi email) -> `done`.
+  const [step, setStep] = useState<'form' | 'otp' | 'done'>('form')
+  const [otp, setOtp] = useState('')
+  const [otpError, setOtpError] = useState<string | null>(null)
+  const [otpNotice, setOtpNotice] = useState<string | null>(null)
+  const [verifying, setVerifying] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
+  const [emailVerified, setEmailVerified] = useState(false)
+
+  // Hitung mundur tombol "Kirim ulang OTP".
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const timer = setInterval(() => setCooldown((c) => (c <= 1 ? 0 : c - 1)), 1000)
+    return () => clearInterval(timer)
+  }, [cooldown])
+
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))
     setErrors((e) => ({ ...e, [key]: undefined }))
@@ -104,6 +121,12 @@ export function RegisterPage() {
         password: form.password,
       })
       setResult(created)
+      setOtp('')
+      setOtpError(null)
+      setOtpNotice(null)
+      setEmailVerified(false)
+      setCooldown(60)
+      setStep('otp')
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       setGeneralError(errorMessage(err))
@@ -112,7 +135,125 @@ export function RegisterPage() {
     }
   }
 
-  if (result) {
+  async function onVerifyOtp(ev: React.FormEvent) {
+    ev.preventDefault()
+    if (verifying || !result) return
+    const code = otp.trim()
+    if (code.length < 6) {
+      setOtpError('Masukkan kode OTP yang kami kirim ke email Anda.')
+      return
+    }
+    setOtpError(null)
+    setOtpNotice(null)
+    setVerifying(true)
+    try {
+      await registrationApi.verifyOtp(result.email, code)
+      setEmailVerified(true)
+      setStep('done')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (err) {
+      setOtpError(errorMessage(err))
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  async function onResendOtp() {
+    if (resending || cooldown > 0 || !result) return
+    setResending(true)
+    setOtpError(null)
+    setOtpNotice(null)
+    try {
+      const res = await registrationApi.resendOtp(result.email)
+      setOtpNotice(res.message)
+      setCooldown(60)
+    } catch (err) {
+      setOtpError(errorMessage(err))
+    } finally {
+      setResending(false)
+    }
+  }
+
+  if (step === 'otp' && result) {
+    return (
+      <div className="mx-auto w-full max-w-lg px-4 py-10 sm:px-6 sm:py-14">
+        <PageHeader
+          title="Verifikasi Email"
+          description="Masukkan kode OTP yang kami kirim ke email Anda untuk mengonfirmasi pendaftaran."
+          breadcrumb={
+            <Link to="/" className="hover:text-primary">
+              Beranda
+            </Link>
+          }
+        />
+
+        <div className="card p-6 sm:p-8">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Icon name="mail" size={24} />
+          </span>
+          <h1 className="mt-4 text-[22px] font-bold text-ink">Cek email Anda</h1>
+          <p className="mt-2 text-sm text-muted">
+            Kami mengirim kode OTP 8 karakter ke{' '}
+            <span className="font-semibold text-ink">{result.email}</span>. Kode berlaku selama 5 menit.
+          </p>
+
+          <form onSubmit={onVerifyOtp} className="mt-5 space-y-4" noValidate>
+            <Input
+              label="Kode OTP"
+              value={otp}
+              onChange={(e) => {
+                setOtp(e.target.value)
+                setOtpError(null)
+              }}
+              error={otpError ?? undefined}
+              placeholder="8 karakter dari email"
+              maxLength={12}
+              autoComplete="one-time-code"
+              autoFocus
+              required
+            />
+
+            {otpNotice && <Alert tone="success">{otpNotice}</Alert>}
+
+            <Button type="submit" size="lg" loading={verifying} block>
+              Verifikasi Email
+            </Button>
+          </form>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-[12.5px] text-muted">
+            <span>Tidak menerima kode?</span>
+            <button
+              type="button"
+              className="font-medium text-primary transition hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => void onResendOtp()}
+              disabled={resending || cooldown > 0}
+            >
+              {resending
+                ? 'Mengirim…'
+                : cooldown > 0
+                  ? `Kirim ulang dalam ${cooldown} detik`
+                  : 'Kirim ulang OTP'}
+            </button>
+          </div>
+
+          <div className="mt-5 border-t border-line pt-4">
+            <button
+              type="button"
+              className="text-[13px] font-medium text-muted transition hover:text-primary"
+              onClick={() => {
+                setStep('done')
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+            >
+              Verifikasi nanti — lanjut ke ringkasan pendaftaran
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'done' && result) {
     return (
       <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="card p-6 sm:p-8">
@@ -128,6 +269,12 @@ export function RegisterPage() {
             Setelah diverifikasi, akun Anda otomatis aktif — silakan masuk menggunakan <strong>email</strong>{' '}
             dan <strong>password</strong> yang Anda buat tadi.
           </p>
+
+          <Alert tone={emailVerified ? 'success' : 'warning'} className="mt-4">
+            {emailVerified
+              ? 'Email Anda berhasil diverifikasi.'
+              : 'Email Anda belum diverifikasi. Verifikasi email membantu mempercepat proses persetujuan pengurus.'}
+          </Alert>
 
           <dl className="mt-6 grid gap-3 rounded-card border border-line bg-bg/60 p-4 sm:grid-cols-2">
             <div>

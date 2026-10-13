@@ -199,6 +199,8 @@ export interface RegistrationRow extends QueryResultRow {
   status: RegistrationStatus
   submitted_at: Date | string
   internal_note: string | null
+  /** Waktu email pendaftar diverifikasi lewat OTP (null bila belum). */
+  email_verified_at?: Date | string | null
   /** Hash bcrypt password pilihan calon anggota (dipakai saat akun dibuat otomatis). */
   password_hash?: string | null
 }
@@ -222,6 +224,11 @@ export function mapRegistration(row: RegistrationRow) {
     submittedAt:
       row.submitted_at instanceof Date ? row.submitted_at.toISOString() : String(row.submitted_at),
     internalNote: row.internal_note ?? undefined,
+    emailVerifiedAt: row.email_verified_at
+      ? row.email_verified_at instanceof Date
+        ? row.email_verified_at.toISOString()
+        : String(row.email_verified_at)
+      : undefined,
   }
 }
 

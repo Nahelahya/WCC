@@ -94,6 +94,115 @@ registrationRouter.post(
   }),
 )
 
+/**
+ * Memverifikasi email pendaftar dengan kode OTP yang dikirim saat mendaftar.
+ *
+ * Publik (tanpa login) karena calon anggota belum punya akun. Menandai
+ * `otp_codes.verified_at` sekaligus `registrations.email_verified_at` agar
+ * pengurus dapat melihat status verifikasi email di menu Pendaftaran.
+ */
+registrationRouter.post(
+  '/verify-otp',
+  wrap(async (req, res) => {
+    const { email, otp } = z
+      .object({
+        email: z.string().trim().email('Format email tidak valid.'),
+        otp: z.string().trim().min(6).max(12, 'Kode OTP tidak valid.'),
+      })
+      .parse(req.body ?? {})
+
+    const h = hashOtp(otp)
+    const { rows } = await query<{
+      id: string
+      used_at: Date | null
+      verified_at: Date | null
+      expires_at: Date
+      tries: number
+      max_tries: number
+    }>(
+      `select id, used_at, verified_at, expires_at, tries, max_tries
+       from otp_codes
+       where lower(email) = lower($1) and purpose = 'email_verify' and otp_hash = $2
+       order by created_at desc limit 1`,
+      [email, h],
+    )
+
+    const c = rows[0]
+    if (!c) throw ApiError.badRequest('Kode OTP tidak valid.')
+    if (c.used_at) throw ApiError.badRequest('Kode OTP sudah digunakan.')
+    if (c.verified_at) throw ApiError.badRequest('Kode OTP sudah diverifikasi sebelumnya.')
+    if (new Date(c.expires_at).getTime() < Date.now()) throw ApiError.badRequest('Kode OTP sudah kedaluwarsa.')
+    if (c.tries >= c.max_tries) throw ApiError.badRequest('Percobaan OTP melebihi batas. Minta kode baru.')
+
+    await query('update otp_codes set verified_at = now(), tries = tries + 1 where id = $1', [c.id])
+    await query(
+      `update registrations set email_verified_at = now()
+       where lower(email) = lower($1) and email_verified_at is null`,
+      [email],
+    )
+    res.json({ verified: true })
+  }),
+)
+
+/**
+ * Mengirim ulang kode OTP verifikasi email pendaftaran.
+ *
+ * Selalu membalas dengan pesan generik agar tidak membocorkan apakah email
+ * terdaftar. Ada jeda minimal 60 detik antar pengiriman untuk mencegah spam.
+ */
+registrationRouter.post(
+  '/resend-otp',
+  wrap(async (req, res) => {
+    const { email } = z
+      .object({ email: z.string().trim().email('Format email tidak valid.') })
+      .parse(req.body ?? {})
+
+    const { rows: regs } = await query<{ full_name: string; email_verified_at: Date | null }>(
+      `select full_name, email_verified_at from registrations
+       where lower(email) = lower($1)
+       order by submitted_at desc limit 1`,
+      [email],
+    )
+    const reg = regs[0]
+
+    if (reg && !reg.email_verified_at) {
+      const { rows: recent } = await query<{ created_at: Date }>(
+        `select created_at from otp_codes
+         where lower(email) = lower($1) and purpose = 'email_verify'
+         order by created_at desc limit 1`,
+        [email],
+      )
+      const last = recent[0]?.created_at
+      const tooSoon = last ? Date.now() - new Date(last).getTime() < 60_000 : false
+
+      if (!tooSoon) {
+        // Batalkan OTP lama yang belum dipakai, lalu terbitkan kode baru.
+        await query(
+          `update otp_codes set used_at = now()
+           where lower(email) = lower($1) and purpose = 'email_verify'
+             and used_at is null and verified_at is null`,
+          [email],
+        )
+        const otp = generateOtp(8)
+        await query(
+          `insert into otp_codes (id, purpose, email, otp_hash, expires_at, max_tries)
+           values ($1, 'email_verify', $2, $3, now() + make_interval(mins => 5), 5)`,
+          [newId('otp'), email, hashOtp(otp)],
+        )
+        try {
+          await sendMail(emailVerifyOtpEmail(email, reg.full_name, otp))
+        } catch (err) {
+          console.error('Gagal mengirim ulang OTP verifikasi email:', err)
+        }
+      }
+    }
+
+    res.json({
+      message: `Jika ${email} terdaftar, kami telah mengirim kode OTP baru ke email tersebut.`,
+    })
+  }),
+)
+
 // Harus dideklarasikan SEBELUM rute '/:id' agar tidak tertukar.
 registrationRouter.get(
   '/status',

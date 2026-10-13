@@ -235,6 +235,12 @@ export function RegistrationsPage() {
                 ['Nama orang tua/wali', detail.parentName || '—'],
                 ['Kontak orang tua/wali', detail.parentPhone || '—'],
                 ['Persetujuan data', detail.consent ? 'Disetujui' : 'Belum disetujui'],
+                [
+                  'Verifikasi email',
+                  detail.emailVerifiedAt
+                    ? `Terverifikasi (${formatDateTimeID(detail.emailVerifiedAt)})`
+                    : 'Belum terverifikasi',
+                ],
               ].map(([k, v]) => (
                 <div key={k} className="rounded-control border border-line bg-bg/50 p-3">
                   <dt className="text-[12px] text-muted">{k}</dt>

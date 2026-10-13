@@ -487,6 +487,15 @@ export const registrationApi = {
   async getByEmail(email: string): Promise<Registration[]> {
     return delay(read().registrations.filter((r) => r.email.toLowerCase() === email.trim().toLowerCase()))
   },
+  async verifyOtp(_email: string, otp: string): Promise<{ verified: boolean }> {
+    if (otp.trim().length < 6) return fail('Kode OTP tidak valid.')
+    return delay({ verified: true })
+  },
+  async resendOtp(email: string): Promise<{ message: string }> {
+    return delay({
+      message: `Jika ${email} terdaftar, kami telah mengirim kode OTP baru ke email tersebut.`,
+    })
+  },
   async submit(input: {
     fullName: string
     email: string
