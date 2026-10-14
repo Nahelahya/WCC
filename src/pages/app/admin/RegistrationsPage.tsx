@@ -261,7 +261,7 @@ export function RegistrationsPage() {
                 [
                   'Metode pembayaran',
                   detail.paymentMethod === 'gateway'
-                    ? 'Online (DOKU)'
+                    ? 'Online'
                     : detail.paymentMethod === 'cash'
                       ? 'Tunai'
                       : '—',
@@ -283,7 +283,7 @@ export function RegistrationsPage() {
                 <p className="text-[12.5px] text-muted">Pembayaran biaya administrasi</p>
                 <p className="mt-0.5 text-sm font-medium text-ink">
                   {detail.paymentStatus === 'lunas' ? 'Sudah lunas' : 'Belum lunas'}
-                  {detail.paymentMethod === 'gateway' ? ' · online DOKU' : detail.paymentMethod === 'cash' ? ' · tunai' : ''}
+                  {detail.paymentMethod === 'gateway' ? ' · online' : detail.paymentMethod === 'cash' ? ' · tunai' : ''}
                 </p>
               </div>
               <Button

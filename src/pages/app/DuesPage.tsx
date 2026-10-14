@@ -118,7 +118,7 @@ export function DuesPage() {
             </Alert>
           ) : !configured ? (
             <Alert tone="warning" className="mt-5" title="Pembayaran online belum aktif">
-              Belum bisa membayar lewat DOKU. Silakan bayar {rupiah(dues.outstanding)} secara tunai
+              Belum bisa membayar secara online. Silakan bayar {rupiah(dues.outstanding)} secara tunai
               kepada pengurus.
             </Alert>
           ) : (
@@ -126,7 +126,7 @@ export function DuesPage() {
               <h2 className="text-[15px] font-semibold text-ink">Bayar iuran</h2>
               <p className="mt-1 text-[13px] text-muted">
                 Isi nominal bila ingin mencicil, atau kosongkan untuk melunasi sisanya (
-                {rupiah(dues.outstanding)}). Anda akan diarahkan ke halaman pembayaran DOKU.
+                {rupiah(dues.outstanding)}). Anda akan diarahkan ke halaman pembayaran.
               </p>
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="sm:max-w-[220px]">

@@ -22,6 +22,8 @@ import type {
   CheckoutResult,
   CreateUserInput,
   DuesState,
+  ManualDuesInput,
+  MemberDues,
   MyPayments,
   Payment,
   PaymentAdminFilter,
@@ -677,6 +679,30 @@ function periodNow(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+/** Ringkasan iuran satu anggota untuk sebuah periode (mode demo). */
+function memberDuesSnapshot(userId: string, userName: string, period: string): MemberDues {
+  const rows = demoPayments.filter(
+    (p) => p.purpose === 'iuran' && p.userId === userId && p.period === period,
+  )
+  const manual = rows.filter((p) => p.channel === 'cash').reduce((sum, p) => sum + p.amount, 0)
+  const online = rows.filter((p) => p.channel !== 'cash').reduce((sum, p) => sum + p.amount, 0)
+  const paid = manual + online
+  const outstanding = Math.max(0, DEMO_MONTHLY_DUES - paid)
+  return {
+    user: { id: userId, name: userName },
+    dues: {
+      period,
+      monthlyAmount: DEMO_MONTHLY_DUES,
+      paidAmount: paid,
+      outstanding,
+      status: outstanding <= 0 ? 'lunas' : paid > 0 ? 'sebagian' : 'belum',
+    },
+    manualAmount: manual,
+    onlineAmount: online,
+    payments: [...rows],
+  }
+}
+
 export const paymentApi = {
   async config(): Promise<PaymentConfig> {
     return delay({
@@ -747,6 +773,52 @@ export const paymentApi = {
       channel: p.channel,
       paidAt: p.paidAt,
     })
+  },
+
+  /** Ringkasan iuran satu anggota untuk sebuah periode (khusus pengurus). */
+  async member(userId: string, period?: string): Promise<MemberDues> {
+    const db = read()
+    const user = db.users.find((u) => u.id === userId)
+    if (!user) return fail('Anggota tidak ditemukan.', 404)
+    return delay(memberDuesSnapshot(userId, user.name, period ?? periodNow()))
+  },
+
+  /** Mencatat/mengubah iuran tunai; amount 0 menghapus catatan periode itu. */
+  async saveManual(input: ManualDuesInput): Promise<MemberDues> {
+    const db = read()
+    const user = db.users.find((u) => u.id === input.userId)
+    if (!user) return fail('Anggota tidak ditemukan.', 404)
+    const amount = Math.max(0, Math.round(input.amount))
+    const idx = demoPayments.findIndex(
+      (p) =>
+        p.purpose === 'iuran' &&
+        p.channel === 'cash' &&
+        p.userId === input.userId &&
+        p.period === input.period,
+    )
+    if (amount <= 0) {
+      if (idx >= 0) demoPayments.splice(idx, 1)
+    } else if (idx >= 0) {
+      demoPayments[idx] = { ...demoPayments[idx], amount, updatedAt: new Date().toISOString() }
+    } else {
+      demoPayments.unshift({
+        id: uid('pay'),
+        purpose: 'iuran',
+        status: 'paid',
+        amount,
+        invoiceNumber: `DEMO${Date.now().toString(36).toUpperCase()}`,
+        userId: input.userId,
+        period: input.period,
+        payerName: user.name,
+        payerEmail: user.email,
+        payerPhone: user.phone ?? '',
+        channel: 'cash',
+        paidAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+    }
+    return delay(memberDuesSnapshot(input.userId, user.name, input.period))
   },
 }
 

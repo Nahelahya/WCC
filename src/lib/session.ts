@@ -1,12 +1,12 @@
 import type { Session, SessionStatus } from '@/types'
-import { minutesOf, todayISO } from './date'
+import { minutesOf, minutesOfDayWIB, todayISO } from './date'
 
 export function sessionStatus(s: Session, now: Date = new Date()): SessionStatus {
   if (s.cancelled) return 'dibatalkan'
   const today = todayISO()
   if (s.date > today) return 'akan-datang'
   if (s.date < today) return 'selesai'
-  const cur = now.getHours() * 60 + now.getMinutes()
+  const cur = minutesOfDayWIB(now)
   const start = minutesOf(s.startTime)
   const end = minutesOf(s.endTime)
   if (cur < start) return 'akan-datang'
@@ -27,7 +27,7 @@ export function canCheckIn(s: Session, now: Date = new Date()): { ok: boolean; r
   const st = sessionStatus(s, now)
   if (st === 'dibatalkan') return { ok: false, reason: 'Sesi ini dibatalkan.' }
   if (st === 'akan-datang') {
-    const cur = now.getHours() * 60 + now.getMinutes()
+    const cur = minutesOfDayWIB(now)
     const { open } = checkInWindow(s)
     if (s.date === todayISO() && cur < open)
       return {

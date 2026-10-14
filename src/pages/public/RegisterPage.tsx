@@ -367,7 +367,7 @@ export function RegisterPage() {
                 <h2 className="text-[15px] font-semibold text-ink">Biaya administrasi pendaftaran</h2>
                 <p className="mt-1 text-sm text-muted">
                   {rupiah(registrationFee)} — dibayar sekali dan berlaku seterusnya. Bayar sekarang melalui
-                  DOKU (transfer bank, e-wallet, atau kartu) atau bayar nanti ke pengurus.
+                  transfer bank, e-wallet, atau kartu, atau bayar nanti ke pengurus.
                 </p>
                 {payError && (
                   <Alert tone="error" className="mt-3">
@@ -585,7 +585,7 @@ export function RegisterPage() {
                   onChange={() => set('paymentMethod', 'gateway')}
                 />
                 <span className="text-sm text-ink">
-                  <span className="font-semibold">Online (DOKU)</span>
+                  <span className="font-semibold">Online</span>
                   <span className="mt-0.5 block text-[12.5px] text-muted">
                     Bayar {rupiah(registrationFee)} sekarang via transfer bank, e-wallet, atau kartu.
                     {!gatewayReady && ' Belum tersedia saat ini.'}

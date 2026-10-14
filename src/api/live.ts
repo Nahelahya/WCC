@@ -18,6 +18,8 @@ import type {
   CheckoutInput,
   CheckoutResult,
   CreateUserInput,
+  ManualDuesInput,
+  MemberDues,
   MyPayments,
   PaymentAdminFilter,
   PaymentConfig,
@@ -438,6 +440,19 @@ export const paymentApi = {
   /** Status publik satu invoice (halaman hasil pembayaran). */
   async status(invoiceNumber: string): Promise<PaymentStatusView> {
     return request(`/payments/status/${encodeURIComponent(invoiceNumber)}`)
+  },
+
+  /** Ringkasan iuran satu anggota untuk sebuah periode (khusus pengurus). */
+  async member(userId: string, period?: string): Promise<MemberDues> {
+    return request(`/payments/member/${encodeURIComponent(userId)}${query({ period })}`)
+  },
+
+  /**
+   * Mencatat/mengubah iuran yang dibayar tunai oleh anggota.
+   * `amount: 0` menghapus catatan tunai periode tersebut.
+   */
+  async saveManual(input: ManualDuesInput): Promise<MemberDues> {
+    return request('/payments/manual', { method: 'PUT', body: JSON.stringify(input) })
   },
 }
 

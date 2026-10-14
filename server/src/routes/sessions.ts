@@ -11,6 +11,7 @@ import {
   type SessionRow,
 } from '../lib/mappers'
 import { newId } from '../lib/ids'
+import { wibInstant } from '../lib/time'
 import { requireAuth, requireRole } from '../middleware/auth'
 import type { AttendanceStatus } from '../types'
 
@@ -153,11 +154,10 @@ const SELECT_ATTENDANCE = `
 `
 
 function sessionWindow(session: SessionRow) {
-  const [y, m, d] = session.date.split('-').map(Number)
-  const [sh, sm] = session.start_time.split(':').map(Number)
-  const [eh, em] = session.end_time.split(':').map(Number)
-  const start = new Date(y, m - 1, d, sh, sm)
-  const end = new Date(y, m - 1, d, eh, em)
+  // Jam sesi adalah jam WIB, jadi jendela check-in dihitung dari instant WIB
+  // (server produksi berjalan pada UTC).
+  const start = wibInstant(session.date, session.start_time)
+  const end = wibInstant(session.date, session.end_time)
   // Check-in dibuka 30 menit sebelum sesi dimulai.
   return { opensAt: new Date(start.getTime() - 30 * 60_000), end }
 }

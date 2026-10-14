@@ -6,6 +6,7 @@ import type {
   Role,
   TransactionType,
 } from '../types'
+import { wibTime } from './time'
 
 /* ------------------------------------------------------------------ */
 /* Users                                                               */
@@ -124,8 +125,8 @@ export interface AttendanceRowDB extends QueryResultRow {
 }
 
 function clock(iso: Date | string): string {
-  const d = iso instanceof Date ? iso : new Date(iso)
-  return `${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`
+  // Jam check-in selalu ditampilkan menurut WIB, bukan zona waktu server.
+  return wibTime(iso instanceof Date ? iso : new Date(iso))
 }
 
 export function mapAttendance(row: AttendanceRowDB) {
