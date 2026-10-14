@@ -107,7 +107,7 @@ export function PaymentsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Pembayaran Online"
-        description="Pantau pembayaran biaya administrasi pendaftaran dan iuran kas anggota melalui DOKU."
+        description="Pantau pembayaran biaya administrasi pendaftaran dan iuran kas anggota."
         action={
           <Button variant="secondary" onClick={() => list.reload()}>
             Muat ulang

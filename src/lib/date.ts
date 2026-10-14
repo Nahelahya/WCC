@@ -15,7 +15,33 @@ const MONTHS = [
 
 const DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
 
-/** YYYY-MM-DD dari sebuah Date, memakai waktu lokal. */
+/** Zona waktu klub: WIB (UTC+7, tanpa DST). Semua jam ditampilkan menurut zona ini. */
+export const CLUB_TIME_ZONE = 'Asia/Jakarta'
+
+const isoDateFmt = new Intl.DateTimeFormat('en-CA', {
+  timeZone: CLUB_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+const clockFmt = new Intl.DateTimeFormat('en-GB', {
+  timeZone: CLUB_TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
+
+/** Jam & menit menurut WIB. */
+function wibClock(d: Date): { h: number; m: number } {
+  const parts = clockFmt.formatToParts(d)
+  const pick = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0)
+  return { h: pick('hour') % 24, m: pick('minute') }
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** YYYY-MM-DD dari sebuah Date, memakai komponen lokal (aritmetika tanggal). */
 export function toISO(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -23,8 +49,9 @@ export function toISO(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+/** Tanggal "hari ini" menurut WIB. */
 export function todayISO(): string {
-  return toISO(new Date())
+  return isoDateFmt.format(new Date())
 }
 
 export function parseISO(iso: string): Date {
@@ -67,38 +94,41 @@ export function formatTimeRange(start: string, end: string): string {
   return `${formatTime(start)}–${formatTime(end)}`
 }
 
-/** Dari ISO datetime ke "11 Oktober 2026, 19.05" */
+/** Dari ISO datetime ke "11 Oktober 2026, 19.05" (WIB) */
 export function formatDateTimeID(isoDateTime: string): string {
-  const d = new Date(isoDateTime)
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${formatDateID(toISO(d))}, ${hh}.${mm}`
+  return `${formatDateID(localDateOf(isoDateTime))}, ${timeOf(isoDateTime)}`
 }
 
 /**
- * Mengubah ISO datetime menjadi YYYY-MM-DD menurut waktu lokal.
+ * Mengubah ISO datetime menjadi YYYY-MM-DD menurut WIB (UTC+7).
  * Jangan memakai `.slice(0, 10)` pada ISO datetime karena nilainya UTC
- * (dapat bergeser satu hari pada waktu dini hari di zona WIB/WITA/WIT).
+ * (dapat bergeser satu hari pada waktu dini hari).
  */
 export function localDateOf(isoDateTime: string): string {
-  return toISO(new Date(isoDateTime))
+  return isoDateFmt.format(new Date(isoDateTime))
 }
 
-/** "19.05" dari ISO datetime, menurut waktu lokal. */
+/** "19.05" dari ISO datetime, menurut WIB. */
 export function timeOf(isoDateTime: string): string {
-  const d = new Date(isoDateTime)
-  return `${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`
+  const { h, m } = wibClock(new Date(isoDateTime))
+  return `${pad2(h)}.${pad2(m)}`
 }
 
+/** Jam sekarang "HH.mm" menurut WIB. */
 export function clockTime(d: Date = new Date()): string {
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${hh}.${mm}`
+  const { h, m } = wibClock(d)
+  return `${pad2(h)}.${pad2(m)}`
 }
 
 export function minutesOf(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number)
   return h * 60 + (m ?? 0)
+}
+
+/** Menit sejak tengah malam menurut WIB (mis. 19.05 -> 1145). */
+export function minutesOfDayWIB(d: Date = new Date()): number {
+  const { h, m } = wibClock(d)
+  return h * 60 + m
 }
 
 /** Tanggal relatif ramah pengguna: "Hari ini", "Besok", "3 hari lalu". */
@@ -124,9 +154,9 @@ export function monthLabelID(iso: string): string {
   return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 
-/** Bulan berjalan dalam format 'YYYY-MM' (cocok untuk <input type="month">). */
+/** Bulan berjalan "'YYYY-MM'" menurut WIB (cocok untuk <input type="month">). */
 export function currentMonth(now: Date = new Date()): string {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  return isoDateFmt.format(now).slice(0, 7)
 }
 
 /** Rentang tanggal (from, to) untuk bulan 'YYYY-MM'. */

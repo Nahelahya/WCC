@@ -1,20 +1,26 @@
 /**
- * Pembayaran online (DOKU Checkout).
+ * Pembayaran biaya administrasi pendaftaran & iuran kas anggota.
  *
- *   POST /api/payments/checkout          buat sesi bayar -> URL halaman DOKU
- *   POST /api/payments/doku/notification webhook DOKU (tanda tangan wajib)
+ *   POST /api/payments/checkout          buat sesi bayar -> URL halaman bayar
+ *   POST /api/payments/doku/notification webhook penyedia pembayaran
  *   GET  /api/payments/mine              riwayat + status iuran milik sendiri
  *   GET  /api/payments/status/:invoice   status publik (dipakai halaman hasil)
  *   GET  /api/payments/config            nominal publik (biaya pendaftaran,
  *                                        iuran bulanan, periode berjalan)
  *   GET  /api/payments                   daftar semua (pengurus)
+ *   GET  /api/payments/member/:userId    ringkasan iuran satu anggota (pengurus)
+ *   PUT  /api/payments/manual            catat/ubah iuran tunai (pengurus)
  *
  * Alur:
- *  1. Klien memanggil /checkout -> baris `payments` (pending) + sesi DOKU.
- *  2. Pembeli diarahkan ke URL DOKU dan membayar.
- *  3. DOKU memanggil webhook -> status 'paid' + efek samping:
+ *  1. Klien memanggil /checkout -> baris `payments` (pending) + sesi pembayaran.
+ *  2. Pembeli diarahkan ke halaman pembayaran lalu membayar.
+ *  3. Penyedia pembayaran memanggil webhook -> status 'paid' + efek samping:
  *       - 'pendaftaran': registrations.payment_status = 'lunas'
  *       - 'iuran'      : menambah baris transactions (pemasukan "Iuran Anggota")
+ *
+ * Iuran yang dibayar tunai tidak melewati gateway: pengurus mencatatnya lewat
+ * PUT /api/payments/manual (kanal 'cash') agar ikut terhitung lunas dan masuk
+ * ke Kas & Treasury.
  */
 
 import { Router } from 'express'
@@ -28,6 +34,7 @@ import { requireAuth, requireRole } from '../middleware/auth'
 import { writeAudit } from '../lib/audit'
 import { createDokuCheckout, dokuConfigured, verifyDokuNotification } from '../lib/doku'
 import { mapPayment, type PaymentRow } from '../lib/mappers'
+import { todayISO } from '../lib/time'
 import { env } from '../env'
 
 export const paymentRouter = Router()
@@ -79,6 +86,24 @@ function notificationTargetPath(): string {
   }
 }
 
+/**
+ * Menyamakan status lokal dengan kenyataan gateway.
+ *
+ * Gateway hanya mengirim notifikasi untuk transaksi yang benar-benar
+ * diselesaikan; invoice yang ditinggalkan pembeli tetap 'pending' selamanya di
+ * basis data. Karena itu baris 'pending' yang sudah lewat `expires_at`
+ * ditandai 'expired' saat daftar dibaca.
+ */
+async function expireStalePayments(invoiceNumber?: string): Promise<void> {
+  await query(
+    `update payments
+        set status = 'expired', updated_at = now()
+      where status = 'pending' and expires_at is not null and expires_at < now()
+        ${invoiceNumber ? 'and invoice_number = $1' : ''}`,
+    invoiceNumber ? [invoiceNumber] : [],
+  )
+}
+
 /** Membuat sesi pembayaran DOKU untuk satu baris `payments`. */
 async function createSessionFor(paymentId: string, invoiceNumber: string, description: string, minutes: number) {
   const { rows } = await query<{
@@ -128,6 +153,7 @@ paymentRouter.get(
 paymentRouter.get(
   '/status/:invoice',
   wrap(async (req, res) => {
+    await expireStalePayments(req.params.invoice)
     const { rows } = await query<PaymentRow>(
       `select ${PAYMENT_COLUMNS} from payments where invoice_number = $1`,
       [req.params.invoice],
@@ -326,11 +352,11 @@ async function applyPaid(paymentId: string, payload: unknown): Promise<PaymentRo
     }
 
     if (p.purpose === 'iuran' && p.user_id) {
-      const note = `Iuran ${p.period ?? ''} — ${p.payer_name || 'anggota'} (online DOKU)`.trim()
+      const note = `Iuran ${p.period ?? ''} — ${p.payer_name || 'anggota'} (online)`.trim()
       await client.query(
         `insert into transactions (id, date, type, category, amount, note, recorded_by, created_at)
-         values ($1, current_date, 'pemasukan', 'Iuran Anggota', $2, $3, $4, now())`,
-        [newId('t'), p.amount, note, 'DOKU Gateway'],
+         values ($1, $2, 'pemasukan', 'Iuran Anggota', $3, $4, $5, now())`,
+        [newId('t'), todayISO(), p.amount, note, 'Pembayaran Online'],
       )
     }
     return p
@@ -427,6 +453,7 @@ paymentRouter.get(
   wrap(async (req, res) => {
     const userId = req.auth!.userId
     const period = currentPeriod()
+    await expireStalePayments()
     const monthly = Math.max(0, Math.round(env.monthlyDues))
     const paid = await duesPaid(userId, period)
     const outstanding = Math.max(0, monthly - paid)
@@ -466,6 +493,8 @@ paymentRouter.get(
       })
       .parse(req.query ?? {})
 
+    await expireStalePayments()
+
     const conditions: string[] = []
     const params: unknown[] = []
     if (q.purpose) {
@@ -500,5 +529,173 @@ paymentRouter.get(
         pending: Number(totals.rows[0]?.pending ?? 0),
       },
     })
+  }),
+)
+
+/* --------------------- Iuran tunai (dicatat pengurus) ------------------ */
+
+/** Ringkasan iuran satu anggota untuk sebuah periode (dipakai halaman pengurus). */
+async function memberDuesView(userId: string, period: string) {
+  const { rows: users } = await query<{ id: string; name: string }>(
+    `select id, name from users where id = $1`,
+    [userId],
+  )
+  const user = users[0]
+  if (!user) throw ApiError.notFound('Anggota tidak ditemukan.')
+
+  const monthly = Math.max(0, Math.round(env.monthlyDues))
+  const paid = await duesPaid(userId, period)
+  const outstanding = Math.max(0, monthly - paid)
+
+  const { rows: breakdown } = await query<{ online: number; manual: number }>(
+    `select
+       coalesce(sum(case when channel is distinct from 'cash' then amount else 0 end), 0)::numeric as online,
+       coalesce(sum(case when channel = 'cash' then amount else 0 end), 0)::numeric as manual
+      from payments
+      where purpose = 'iuran' and status = 'paid' and user_id = $1 and period = $2`,
+    [userId, period],
+  )
+
+  const { rows } = await query<PaymentRow>(
+    `select ${PAYMENT_COLUMNS} from payments
+      where purpose = 'iuran' and user_id = $1 and period = $2
+      order by created_at desc`,
+    [userId, period],
+  )
+
+  return {
+    user: { id: user.id, name: user.name },
+    dues: {
+      period,
+      monthlyAmount: monthly,
+      paidAmount: paid,
+      outstanding,
+      status: outstanding <= 0 && monthly > 0 ? 'lunas' : paid > 0 ? 'sebagian' : 'belum',
+    },
+    manualAmount: Number(breakdown[0]?.manual ?? 0),
+    onlineAmount: Number(breakdown[0]?.online ?? 0),
+    payments: rows.map(mapPayment),
+  }
+}
+
+const periodSchema = z.string().regex(/^\d{4}-\d{2}$/, 'Periode tidak valid.')
+
+paymentRouter.get(
+  '/member/:userId',
+  requireAuth,
+  requireRole('pengurus'),
+  wrap(async (req, res) => {
+    const period =
+      z.object({ period: periodSchema.optional() }).parse(req.query ?? {}).period ?? currentPeriod()
+    await expireStalePayments()
+    res.json(await memberDuesView(req.params.userId, period))
+  }),
+)
+
+const manualSchema = z.object({
+  userId: z.string().trim().min(1, 'Anggota wajib dipilih.'),
+  period: periodSchema,
+  amount: z.coerce.number().min(0, 'Nominal tidak boleh negatif.').max(100_000_000),
+})
+
+/**
+ * Mencatat / mengubah / menghapus iuran yang dibayar tunai (kanal 'cash').
+ *
+ * Nominal 0 berarti menghapus catatan tunai periode tersebut (mis. salah catat).
+ * Baris `transactions` yang tertaut ikut diperbarui/dihapus sehingga Kas &
+ * Treasury tetap sinkron.
+ */
+paymentRouter.put(
+  '/manual',
+  requireAuth,
+  requireRole('pengurus'),
+  wrap(async (req, res) => {
+    const input = manualSchema.parse(req.body ?? {})
+    const amount = Math.round(input.amount)
+
+    const { rows: users } = await query<{ name: string; email: string; phone: string | null }>(
+      `select name, email, phone from users where id = $1`,
+      [input.userId],
+    )
+    const user = users[0]
+    if (!user) throw ApiError.notFound('Anggota tidak ditemukan.')
+
+    const { rows: me } = await query<{ name: string }>(`select name from users where id = $1`, [
+      req.auth!.userId,
+    ])
+    const recordedBy = me[0]?.name ?? 'Pengurus'
+    const today = todayISO()
+
+    await withTransaction(async (client) => {
+      const { rows: existing } = await client.query<PaymentRow>(
+        `select ${PAYMENT_COLUMNS} from payments
+          where purpose = 'iuran' and channel = 'cash' and user_id = $1 and period = $2
+          order by created_at desc limit 1`,
+        [input.userId, input.period],
+      )
+      const payment = existing[0]
+
+      if (amount <= 0) {
+        // ON DELETE CASCADE ikut menghapus baris transaksi kas yang tertaut.
+        if (payment) await client.query(`delete from payments where id = $1`, [payment.id])
+        return
+      }
+
+      const note = `Iuran ${input.period} — ${user.name} (tunai)`
+
+      if (payment) {
+        await client.query(
+          `update payments
+              set amount = $2, payer_name = $3, paid_at = now(), updated_at = now()
+            where id = $1`,
+          [payment.id, amount, user.name],
+        )
+        const { rowCount } = await client.query(
+          `update transactions set amount = $2, note = $3, recorded_by = $4 where payment_id = $1`,
+          [payment.id, amount, note, recordedBy],
+        )
+        if (!rowCount) {
+          await client.query(
+            `insert into transactions (id, date, type, category, amount, note, recorded_by, payment_id, created_at)
+             values ($1, $2, 'pemasukan', 'Iuran Anggota', $3, $4, $5, $6, now())`,
+            [newId('t'), today, amount, note, recordedBy, payment.id],
+          )
+        }
+        return
+      }
+
+      const id = newId('pay')
+      await client.query(
+        `insert into payments
+           (id, purpose, status, amount, invoice_number, user_id, period,
+            payer_name, payer_email, payer_phone, channel, paid_at)
+         values ($1, 'iuran', 'paid', $2, $3, $4, $5, $6, $7, $8, 'cash', now())`,
+        [
+          id,
+          amount,
+          invoiceNumberFor('iuran'),
+          input.userId,
+          input.period,
+          user.name,
+          user.email,
+          user.phone ?? '',
+        ],
+      )
+      await client.query(
+        `insert into transactions (id, date, type, category, amount, note, recorded_by, payment_id, created_at)
+         values ($1, $2, 'pemasukan', 'Iuran Anggota', $3, $4, $5, $6, now())`,
+        [newId('t'), today, amount, note, recordedBy, id],
+      )
+    })
+
+    await writeAudit({
+      userId: input.userId,
+      action: amount > 0 ? 'update' : 'delete',
+      entity: 'payment',
+      entityId: `${input.userId}:${input.period}`,
+      detail: { purpose: 'iuran', period: input.period, amount, channel: 'cash' },
+    }).catch(() => {})
+
+    res.json(await memberDuesView(input.userId, input.period))
   }),
 )

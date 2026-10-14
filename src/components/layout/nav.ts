@@ -30,7 +30,6 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/app', label: 'Dashboard Coach', icon: 'home', mobile: true, end: true },
     { to: '/app/jadwal', label: 'Jadwal yang Diampu', icon: 'calendar', mobile: true },
     { to: '/app/absensi', label: 'Daftar Hadir', icon: 'list', mobile: true },
-    { to: '/app/iuran', label: 'Iuran Saya', icon: 'wallet' },
     { to: '/app/kas', label: 'Kas & Treasury', icon: 'wallet', mobile: true },
     { to: '/app/pengumuman', label: 'Pengumuman', icon: 'megaphone' },
     { to: '/app/profil', label: 'Profil Akun', icon: 'user' },
@@ -44,7 +43,6 @@ export const NAV: Record<Role, NavItem[]> = {
     { to: '/app/pengguna', label: 'Manajemen Pengguna', icon: 'user' },
     { to: '/app/pendaftaran', label: 'Pendaftaran Anggota', icon: 'inbox' },
     { to: '/app/pembayaran', label: 'Pembayaran Online', icon: 'wallet' },
-    { to: '/app/iuran', label: 'Iuran Saya', icon: 'wallet' },
     { to: '/app/kas', label: 'Kas & Treasury', icon: 'wallet' },
     { to: '/app/laporan', label: 'Laporan', icon: 'chart' },
     { to: '/app/sinkronisasi', label: 'Sinkronisasi', icon: 'refresh' },
@@ -71,7 +69,7 @@ export function overflowNavFor(role: Role): NavItem[] {
 /** Halaman apa saja yang boleh diakses tiap peran (otorisasi sisi klien). */
 export const ALLOWED: Record<Role, string[]> = {
   anggota: ['/app', '/app/jadwal', '/app/absensi', '/app/pengumuman', '/app/iuran', '/app/kas', '/app/profil'],
-  coach: ['/app', '/app/jadwal', '/app/absensi', '/app/pengumuman', '/app/iuran', '/app/kas', '/app/profil'],
+  coach: ['/app', '/app/jadwal', '/app/absensi', '/app/pengumuman', '/app/kas', '/app/profil'],
   pengurus: [
     '/app',
     '/app/jadwal',
@@ -81,7 +79,6 @@ export const ALLOWED: Record<Role, string[]> = {
     '/app/pengguna',
     '/app/pendaftaran',
     '/app/pembayaran',
-    '/app/iuran',
     '/app/kas',
     '/app/laporan',
     '/app/sinkronisasi',

@@ -133,6 +133,32 @@ export interface MyPayments {
   payments: Payment[]
 }
 
+/* ------------------------------------------------------------------ */
+/* Iuran anggota (dilihat & dicatat pengurus)                           */
+/* ------------------------------------------------------------------ */
+
+/** Ringkasan iuran satu anggota untuk sebuah periode, untuk halaman pengurus. */
+export interface MemberDues {
+  user: { id: string; name: string }
+  dues: DuesState
+  /** Total yang dicatat tunai oleh pengurus pada periode ini. */
+  manualAmount: number
+  /** Total yang dibayar lewat kanal online pada periode ini. */
+  onlineAmount: number
+  /** Riwayat pembayaran periode ini. */
+  payments: Payment[]
+}
+
+/**
+ * Mencatat/mengubah iuran tunai anggota. `amount: 0` berarti menghapus
+ * catatan tunai periode tersebut (mis. salah catat).
+ */
+export interface ManualDuesInput {
+  userId: string
+  period: string
+  amount: number
+}
+
 export interface AdminPayments {
   payments: Payment[]
   totals: { paid: number; pending: number }
