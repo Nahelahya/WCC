@@ -203,6 +203,10 @@ export interface RegistrationRow extends QueryResultRow {
   email_verified_at?: Date | string | null
   /** Hash bcrypt password pilihan calon anggota (dipakai saat akun dibuat otomatis). */
   password_hash?: string | null
+  /** Metode bayar biaya administrasi: 'cash' | 'gateway'. */
+  payment_method?: string | null
+  /** Status bayar biaya administrasi: 'belum' | 'lunas'. */
+  payment_status?: string | null
 }
 
 export function mapRegistration(row: RegistrationRow) {
@@ -229,6 +233,8 @@ export function mapRegistration(row: RegistrationRow) {
         ? row.email_verified_at.toISOString()
         : String(row.email_verified_at)
       : undefined,
+    paymentMethod: (row.payment_method as 'cash' | 'gateway' | null) ?? undefined,
+    paymentStatus: row.payment_status === 'lunas' ? 'lunas' : 'belum',
   }
 }
 
@@ -283,5 +289,60 @@ export function mapSyncLog(row: SyncLogRow) {
     status: row.status,
     message: row.message,
     rows: row.rows,
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Payments (DOKU Checkout)                                            */
+/* ------------------------------------------------------------------ */
+
+export type PaymentPurpose = 'pendaftaran' | 'iuran'
+export type PaymentStatus = 'pending' | 'paid' | 'expired' | 'failed'
+
+export interface PaymentRow extends QueryResultRow {
+  id: string
+  purpose: PaymentPurpose
+  status: PaymentStatus
+  amount: number
+  invoice_number: string
+  user_id: string | null
+  registration_id: string | null
+  period: string | null
+  payer_name: string
+  payer_email: string
+  payer_phone: string
+  channel: string | null
+  doku_session_id: string | null
+  doku_token_id: string | null
+  doku_url: string | null
+  paid_at: Date | string | null
+  expires_at: Date | string | null
+  created_at: Date | string
+  updated_at: Date | string
+}
+
+function isoOrUndefined(value: Date | string | null | undefined): string | undefined {
+  if (!value) return undefined
+  return value instanceof Date ? value.toISOString() : String(value)
+}
+
+export function mapPayment(row: PaymentRow) {
+  return {
+    id: row.id,
+    purpose: row.purpose,
+    status: row.status,
+    amount: Number(row.amount),
+    invoiceNumber: row.invoice_number,
+    userId: row.user_id ?? undefined,
+    registrationId: row.registration_id ?? undefined,
+    period: row.period ?? undefined,
+    payerName: row.payer_name,
+    payerEmail: row.payer_email,
+    payerPhone: row.payer_phone,
+    channel: row.channel ?? undefined,
+    paidAt: isoOrUndefined(row.paid_at),
+    expiresAt: isoOrUndefined(row.expires_at),
+    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
   }
 }

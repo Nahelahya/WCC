@@ -46,6 +46,25 @@ export const env = {
   /** Resource ID kotak surat (mis. `AC…`). Bila kosong, diambil otomatis dari `GET /api/v1/me`. */
   hostingerMailMailboxId: process.env.HOSTINGER_MAIL_MAILBOX_ID ?? '',
 
+  // ---- Pembayaran online (DOKU Checkout) ----
+  // Client-Id & Secret Key dari dashboard DOKU (Jokul). Kosong = pembayaran
+  // online nonaktif; aplikasi tetap berjalan dengan pembayaran tunai.
+  dokuClientId: process.env.DOKU_CLIENT_ID ?? '',
+  dokuSecretKey: process.env.DOKU_SECRET_KEY ?? '',
+  /** https://api.doku.com (produksi) atau https://api-sandbox.doku.com (uji). */
+  dokuBaseUrl: (process.env.DOKU_BASE_URL ?? 'https://api.doku.com').replace(/\/+$/, ''),
+  /** Path URL notifikasi webhook yang juga didaftarkan di dashboard DOKU. */
+  dokuNotificationPath: process.env.DOKU_NOTIFICATION_PATH ?? '/api/payments/doku/notification',
+  /**
+   * URL publik lengkap yang dipakai DOKU untuk mengirim notifikasi webhook.
+   * Bila kosong, diturunkan dari PUBLIC_APP_URL + DOKU_NOTIFICATION_PATH.
+   */
+  dokuNotificationUrl: process.env.DOKU_NOTIFICATION_URL ?? '',
+  /** Biaya administrasi pendaftaran (sekali bayar), dalam Rupiah. */
+  registrationFee: Number(process.env.PAYMENT_REGISTRATION_FEE ?? 50000),
+  /** Iuran kas per bulan, dalam Rupiah. Anggota boleh mencicil. */
+  monthlyDues: Number(process.env.PAYMENT_DUES_MONTHLY ?? 60000),
+
   // ---- Penyimpanan berkas (unggahan) ----
   uploadDir: process.env.UPLOAD_DIR ?? 'uploads',
   uploadMaxMb: Number(process.env.UPLOAD_MAX_MB ?? 5),

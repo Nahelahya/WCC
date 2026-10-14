@@ -25,6 +25,7 @@ export function RegistrationsPage() {
   const [note, setNote] = useState('')
   const [working, setWorking] = useState(false)
   const [pending, setPending] = useState<RegistrationStatus | null>(null)
+  const [paymentBusy, setPaymentBusy] = useState(false)
 
   const rows = useMemo(() => {
     let data = list.data ?? []
@@ -58,6 +59,22 @@ export function RegistrationsPage() {
     } finally {
       setWorking(false)
       setPending(null)
+    }
+  }
+
+  /** Menandai biaya administrasi lunas (mis. bayar tunai ke pengurus). */
+  async function togglePayment(paid: boolean) {
+    if (!detail) return
+    setPaymentBusy(true)
+    try {
+      const updated = await registrationApi.setPayment(detail.id, paid ? 'lunas' : 'belum')
+      setDetail(updated)
+      list.reload()
+      toast(paid ? 'Pembayaran ditandai lunas.' : 'Status pembayaran dikembalikan ke belum.', 'success')
+    } catch (err) {
+      toast(errorMessage(err), 'error')
+    } finally {
+      setPaymentBusy(false)
     }
   }
 
@@ -241,6 +258,18 @@ export function RegistrationsPage() {
                     ? `Terverifikasi (${formatDateTimeID(detail.emailVerifiedAt)})`
                     : 'Belum terverifikasi',
                 ],
+                [
+                  'Metode pembayaran',
+                  detail.paymentMethod === 'gateway'
+                    ? 'Online (DOKU)'
+                    : detail.paymentMethod === 'cash'
+                      ? 'Tunai'
+                      : '—',
+                ],
+                [
+                  'Biaya administrasi',
+                  detail.paymentStatus === 'lunas' ? 'Lunas' : 'Belum dibayar',
+                ],
               ].map(([k, v]) => (
                 <div key={k} className="rounded-control border border-line bg-bg/50 p-3">
                   <dt className="text-[12px] text-muted">{k}</dt>
@@ -248,6 +277,25 @@ export function RegistrationsPage() {
                 </div>
               ))}
             </dl>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line bg-bg/50 p-3">
+              <div>
+                <p className="text-[12.5px] text-muted">Pembayaran biaya administrasi</p>
+                <p className="mt-0.5 text-sm font-medium text-ink">
+                  {detail.paymentStatus === 'lunas' ? 'Sudah lunas' : 'Belum lunas'}
+                  {detail.paymentMethod === 'gateway' ? ' · online DOKU' : detail.paymentMethod === 'cash' ? ' · tunai' : ''}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant={detail.paymentStatus === 'lunas' ? 'secondary' : 'primary'}
+                loading={paymentBusy}
+                disabled={working}
+                onClick={() => void togglePayment(detail.paymentStatus !== 'lunas')}
+              >
+                {detail.paymentStatus === 'lunas' ? 'Tandai belum bayar' : 'Tandai sudah bayar'}
+              </Button>
+            </div>
 
             <div className="rounded-control border border-line p-3">
               <p className="text-[12px] text-muted">Alamat lengkap</p>

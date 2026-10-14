@@ -7,12 +7,14 @@ import { HowToJoinPage, PublicCoachesPage } from '@/pages/public/PublicCoachesPa
 import { ForgotPasswordPage, LoginPage } from '@/pages/public/LoginPage'
 import { ResetPasswordPage } from '@/pages/public/ResetPasswordPage'
 import { RegisterPage, RegisterStatusPage } from '@/pages/public/RegisterPage'
+import { PaymentStatusPage } from '@/pages/public/PaymentStatusPage'
 import { DashboardPage } from '@/pages/app/DashboardPage'
 import { SchedulePage } from '@/pages/app/SchedulePage'
 import { SessionDetailPage } from '@/pages/app/SessionDetailPage'
 import { AttendancePage } from '@/pages/app/AttendancePage'
 import { AnnouncementDetailPage, AnnouncementsPage } from '@/pages/app/AnnouncementsPage'
 import { ProfilePage } from '@/pages/app/ProfilePage'
+import { DuesPage } from '@/pages/app/DuesPage'
 import { CoachAdminPage } from '@/pages/app/admin/CoachAdminPage'
 import { RegistrationsPage } from '@/pages/app/admin/RegistrationsPage'
 import { TreasuryPage } from '@/pages/app/admin/TreasuryPage'
@@ -21,6 +23,7 @@ import { SyncPage } from '@/pages/app/admin/SyncPage'
 import { AuditLogPage } from '@/pages/app/admin/AuditLogPage'
 import { LandingSettingsPage } from '@/pages/app/admin/LandingSettingsPage'
 import { UsersPage } from '@/pages/app/admin/UsersPage'
+import { PaymentsPage } from '@/pages/app/admin/PaymentsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 export function App() {
@@ -33,6 +36,7 @@ export function App() {
         <Route path="/cara-bergabung" element={<HowToJoinPage />} />
         <Route path="/daftar" element={<RegisterPage />} />
         <Route path="/daftar/status" element={<RegisterStatusPage />} />
+        <Route path="/pembayaran" element={<PaymentStatusPage />} />
         <Route path="/kebijakan-privasi" element={<PrivacyPolicyPage />} />
       </Route>
 
@@ -51,6 +55,8 @@ export function App() {
         <Route path="pengumuman/:id" element={<AnnouncementDetailPage />} />
         <Route path="coach" element={<CoachAdminPage />} />
         <Route path="pendaftaran" element={<RegistrationsPage />} />
+        <Route path="pembayaran" element={<PaymentsPage />} />
+        <Route path="iuran" element={<DuesPage />} />
         <Route path="pengguna" element={<UsersPage />} />
         <Route path="kas" element={<TreasuryPage />} />
         <Route path="laporan" element={<ReportsPage />} />

@@ -88,3 +88,18 @@ export const REGISTRATION_LABEL: Record<string, string> = {
   diverifikasi: 'Diverifikasi',
   ditolak: 'Ditolak',
 }
+
+/** Status pembayaran online (DOKU). */
+export const PAYMENT_TONE: Record<string, StatusTone> = {
+  pending: 'warning',
+  paid: 'success',
+  expired: 'neutral',
+  failed: 'danger',
+}
+
+export const PAYMENT_LABEL: Record<string, string> = {
+  pending: 'Menunggu pembayaran',
+  paid: 'Lunas',
+  expired: 'Kedaluwarsa',
+  failed: 'Gagal',
+}

@@ -36,6 +36,8 @@ const submitSchema = z.object({
   experience: z.string().trim().min(1, 'Pengalaman wajib diisi.'),
   motivation: z.string().optional(),
   password: z.string().min(8, 'Password minimal 8 karakter.'),
+  // 'cash' = bayar tunai ke pengurus (nanti); 'gateway' = bayar online via DOKU.
+  paymentMethod: z.enum(['cash', 'gateway']).optional(),
   consent: z
     .boolean()
     .refine((v) => v === true, 'Persetujuan pemrosesan data pribadi wajib dicentang.'),
@@ -49,8 +51,8 @@ registrationRouter.post(
       `insert into registrations
          (id, full_name, email, phone, gender, nik, address, medical_history,
           parent_name, parent_phone, experience, motivation, consent,
-          password_hash, status, submitted_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,$13,'baru', now())
+          password_hash, status, submitted_at, payment_method, payment_status)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,$13,'baru', now(), $14, 'belum')
        returning *`,
       [
         newId('r'),
@@ -66,6 +68,7 @@ registrationRouter.post(
         input.experience,
         input.motivation ?? null,
         await hashPassword(input.password),
+        input.paymentMethod ?? null,
       ],
     )
     // Kirim email konfirmasi & OTP verifikasi email
@@ -344,6 +347,28 @@ registrationRouter.patch(
         registrationDecisionEmail(rows[0].email, rows[0].full_name, rows[0].status, rows[0].internal_note ?? undefined),
       ).catch((err: unknown) => console.error('Gagal mengirim email keputusan pendaftaran:', err))
     }
+    res.json(mapRegistration(rows[0]))
+  }),
+)
+
+/**
+ * Menandai biaya administrasi pendaftaran sudah lunas (mis. dibayar tunai ke
+ * pengurus) atau mengembalikannya ke "belum". Khusus pengurus.
+ */
+registrationRouter.patch(
+  '/:id/payment',
+  requireAuth,
+  requireRole('pengurus'),
+  wrap(async (req, res) => {
+    const { paymentStatus } = z
+      .object({ paymentStatus: z.enum(['belum', 'lunas']) })
+      .parse(req.body ?? {})
+
+    const { rows } = await query<RegistrationRow>(
+      `update registrations set payment_status = $2 where id = $1 returning *`,
+      [req.params.id, paymentStatus],
+    )
+    if (!rows[0]) throw ApiError.notFound('Pendaftaran tidak ditemukan.')
     res.json(mapRegistration(rows[0]))
   }),
 )

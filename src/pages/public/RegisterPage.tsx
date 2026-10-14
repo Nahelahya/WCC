@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { registrationApi } from '@/api/client'
+import { paymentApi, registrationApi } from '@/api/client'
+import type { PaymentConfig } from '@/api/types'
 import { errorMessage } from '@/lib/hooks'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button, buttonClasses } from '@/components/ui/Button'
@@ -26,6 +27,8 @@ interface FormState {
   experience: string
   motivation: string
   consent: boolean
+  /** Metode bayar biaya administrasi: tunai atau online (DOKU). */
+  paymentMethod: 'cash' | 'gateway'
 }
 
 const EMPTY: FormState = {
@@ -43,6 +46,7 @@ const EMPTY: FormState = {
   experience: '',
   motivation: '',
   consent: false,
+  paymentMethod: 'gateway',
 }
 
 export function RegisterPage() {
@@ -61,6 +65,28 @@ export function RegisterPage() {
   const [resending, setResending] = useState(false)
   const [cooldown, setCooldown] = useState(0)
   const [emailVerified, setEmailVerified] = useState(false)
+
+  // Konfigurasi pembayaran: nominal + apakah DOKU sudah aktif di server.
+  const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null)
+  const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
+  const [paidOnline, setPaidOnline] = useState(false)
+  const [payDeferred, setPayDeferred] = useState(false)
+
+  useEffect(() => {
+    paymentApi
+      .config()
+      .then((config) => {
+        setPaymentConfig(config)
+        // Bila DOKU belum aktif, jangan biarkan opsi online terpilih.
+        if (!config.configured) setForm((f) => ({ ...f, paymentMethod: 'cash' }))
+      })
+      .catch(() => setPaymentConfig(null))
+  }, [])
+
+  const registrationFee = paymentConfig?.registrationFee ?? 50000
+  const gatewayReady = paymentConfig?.configured ?? false
+  const rupiah = (value: number) => `Rp ${value.toLocaleString('id-ID')}`
 
   // Hitung mundur tombol "Kirim ulang OTP".
   useEffect(() => {
@@ -119,6 +145,7 @@ export function RegisterPage() {
         motivation: form.motivation,
         consent: form.consent,
         password: form.password,
+        paymentMethod: form.paymentMethod,
       })
       setResult(created)
       setOtp('')
@@ -171,6 +198,30 @@ export function RegisterPage() {
       setOtpError(errorMessage(err))
     } finally {
       setResending(false)
+    }
+  }
+
+  /** Membuat sesi pembayaran DOKU untuk biaya administrasi pendaftaran. */
+  async function onPayRegistration() {
+    if (!result || paying) return
+    setPayError(null)
+    setPaying(true)
+    try {
+      const res = await paymentApi.checkout({
+        purpose: 'pendaftaran',
+        registrationId: result.id,
+        email: result.email,
+      })
+      if (res.url) {
+        window.location.href = res.url // arahkan ke halaman pembayaran DOKU
+        return
+      }
+      setPaying(false)
+      if (res.status === 'paid') setPaidOnline(true)
+      else setPayError('Tautan pembayaran belum tersedia. Silakan coba lagi.')
+    } catch (err) {
+      setPayError(errorMessage(err))
+      setPaying(false)
     }
   }
 
@@ -300,6 +351,45 @@ export function RegisterPage() {
               <dd className="mt-0.5 truncate text-sm font-semibold text-ink">{result.email}</dd>
             </div>
           </dl>
+
+          {result.paymentMethod === 'gateway' ? (
+            paidOnline ? (
+              <Alert tone="success" className="mt-5" title="Pembayaran diterima">
+                Biaya administrasi {rupiah(registrationFee)} sudah dibayar. Terima kasih!
+              </Alert>
+            ) : payDeferred ? (
+              <Alert tone="info" className="mt-5" title="Bayar nanti">
+                Biaya administrasi {rupiah(registrationFee)} belum dibayar. Anda dapat membayarnya nanti
+                melalui pengurus, atau buka kembali halaman ini dan pilih pembayaran online.
+              </Alert>
+            ) : (
+              <div className="mt-5 rounded-card border border-line bg-bg/60 p-4">
+                <h2 className="text-[15px] font-semibold text-ink">Biaya administrasi pendaftaran</h2>
+                <p className="mt-1 text-sm text-muted">
+                  {rupiah(registrationFee)} — dibayar sekali dan berlaku seterusnya. Bayar sekarang melalui
+                  DOKU (transfer bank, e-wallet, atau kartu) atau bayar nanti ke pengurus.
+                </p>
+                {payError && (
+                  <Alert tone="error" className="mt-3">
+                    {payError}
+                  </Alert>
+                )}
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Button size="lg" loading={paying} onClick={() => void onPayRegistration()}>
+                    Bayar {rupiah(registrationFee)}
+                  </Button>
+                  <Button variant="secondary" size="lg" onClick={() => setPayDeferred(true)}>
+                    Bayar Nanti
+                  </Button>
+                </div>
+              </div>
+            )
+          ) : (
+            <Alert tone="info" className="mt-5" title="Biaya administrasi">
+              Anda memilih membayar tunai. Bayar {rupiah(registrationFee)} ke pengurus saat verifikasi
+              pendaftaran.
+            </Alert>
+          )}
 
           <Alert tone="info" className="mt-5" title="Langkah selanjutnya">
             Simpan nomor pendaftaran Anda. Pantau status melalui halaman Cek Status Pendaftaran menggunakan
@@ -477,6 +567,49 @@ export function RegisterPage() {
             placeholder="Ceritakan singkat motivasi Anda."
           />
 
+          <fieldset className="rounded-card border border-line p-4">
+            <legend className="px-1 text-[13px] font-semibold text-ink">
+              Metode pembayaran biaya administrasi
+            </legend>
+            <p className="mt-1 text-[12.5px] text-muted">
+              Biaya administrasi {rupiah(registrationFee)} — dibayar sekali dan berlaku seterusnya.
+            </p>
+            <div className="mt-3 grid gap-2">
+              <label className="flex cursor-pointer items-start gap-3 rounded-control border border-line p-3 transition hover:bg-bg">
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  className="mt-0.5 h-4 w-4 flex-none accent-primary"
+                  checked={form.paymentMethod === 'gateway'}
+                  disabled={!gatewayReady}
+                  onChange={() => set('paymentMethod', 'gateway')}
+                />
+                <span className="text-sm text-ink">
+                  <span className="font-semibold">Online (DOKU)</span>
+                  <span className="mt-0.5 block text-[12.5px] text-muted">
+                    Bayar {rupiah(registrationFee)} sekarang via transfer bank, e-wallet, atau kartu.
+                    {!gatewayReady && ' Belum tersedia saat ini.'}
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-3 rounded-control border border-line p-3 transition hover:bg-bg">
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  className="mt-0.5 h-4 w-4 flex-none accent-primary"
+                  checked={form.paymentMethod === 'cash'}
+                  onChange={() => set('paymentMethod', 'cash')}
+                />
+                <span className="text-sm text-ink">
+                  <span className="font-semibold">Tunai</span>
+                  <span className="mt-0.5 block text-[12.5px] text-muted">
+                    Bayar {rupiah(registrationFee)} langsung ke pengurus (bayar nanti).
+                  </span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
           <Checkbox
             label={
               <>
@@ -593,6 +726,21 @@ export function RegisterStatusPage() {
                       {r.status === 'ditolak' &&
                         'Pendaftaran belum dapat diterima. Silakan hubungi pengurus untuk informasi lebih lanjut.'}
                     </p>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[12.5px]">
+                      <span className="text-muted">Biaya administrasi:</span>
+                      <StatusBadge
+                        tone={r.paymentStatus === 'lunas' ? 'success' : 'warning'}
+                        icon={r.paymentStatus === 'lunas' ? 'check-circle' : 'clock'}
+                      >
+                        {r.paymentStatus === 'lunas' ? 'Lunas' : 'Belum dibayar'}
+                      </StatusBadge>
+                      {r.paymentStatus !== 'lunas' && r.paymentMethod === 'gateway' && (
+                        <span className="text-muted">
+                          · bayar online kapan saja atau ke pengurus
+                        </span>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>

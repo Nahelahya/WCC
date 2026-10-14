@@ -89,6 +89,10 @@ export interface Registration {
   internalNote?: string
   /** Waktu email pendaftar diverifikasi lewat kode OTP (kosong bila belum). */
   emailVerifiedAt?: string
+  /** Metode bayar biaya administrasi yang dipilih: 'cash' | 'gateway'. */
+  paymentMethod?: 'cash' | 'gateway'
+  /** Status bayar biaya administrasi: 'belum' | 'lunas'. */
+  paymentStatus?: 'belum' | 'lunas'
 }
 
 export type TransactionType = 'pemasukan' | 'pengeluaran'

@@ -27,6 +27,7 @@ export const announcementApi = impl.announcementApi
 export const coachApi = impl.coachApi
 export const registrationApi = impl.registrationApi
 export const treasuryApi = impl.treasuryApi
+export const paymentApi = impl.paymentApi
 export const syncApi = impl.syncApi
 export const auditApi = impl.auditApi
 export const statsApi = impl.statsApi
@@ -35,3 +36,4 @@ export const statsApi = impl.statsApi
 export const DEMO_PASSWORD = impl.DEMO_PASSWORD
 
 export type { AttendanceRow, AuthSession, SessionInput, TreasurySummary, UploadResult } from './types'
+export type { Payment, PaymentPurpose, PaymentStatus, PaymentConfig } from './types'

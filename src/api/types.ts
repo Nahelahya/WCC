@@ -65,3 +65,92 @@ export interface UploadResult {
   size: number
   mime: string
 }
+
+/* ------------------------------------------------------------------ */
+/* Pembayaran online (DOKU Checkout)                                   */
+/* ------------------------------------------------------------------ */
+
+export type PaymentPurpose = 'pendaftaran' | 'iuran'
+export type PaymentStatus = 'pending' | 'paid' | 'expired' | 'failed'
+
+export interface PaymentConfig {
+  /** True bila kredensial DOKU sudah diisi di server. */
+  configured: boolean
+  /** Biaya administrasi pendaftaran (sekali bayar), Rupiah. */
+  registrationFee: number
+  /** Iuran kas per bulan, Rupiah (boleh dicicil). */
+  monthlyDues: number
+  /** Periode berjalan 'YYYY-MM'. */
+  period: string
+}
+
+export interface Payment {
+  id: string
+  purpose: PaymentPurpose
+  status: PaymentStatus
+  amount: number
+  invoiceNumber: string
+  userId?: string
+  registrationId?: string
+  /** Periode iuran 'YYYY-MM' (kosong untuk pembayaran pendaftaran). */
+  period?: string
+  payerName: string
+  payerEmail: string
+  payerPhone: string
+  /** Kanal yang dipilih pembeli di halaman DOKU. */
+  channel?: string
+  paidAt?: string
+  expiresAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CheckoutInput {
+  purpose: PaymentPurpose
+  registrationId?: string
+  email?: string
+  period?: string
+  amount?: number
+}
+
+/** Hasil endpoint checkout: ringkasan pembayaran + URL halaman DOKU. */
+export interface CheckoutResult extends Payment {
+  url?: string
+  /** True bila memakai ulang tautan pembayaran yang masih berlaku. */
+  reused?: boolean
+}
+
+export interface DuesState {
+  period: string
+  monthlyAmount: number
+  paidAmount: number
+  outstanding: number
+  status: 'lunas' | 'sebagian' | 'belum'
+}
+
+export interface MyPayments {
+  dues: DuesState
+  payments: Payment[]
+}
+
+export interface AdminPayments {
+  payments: Payment[]
+  totals: { paid: number; pending: number }
+}
+
+/** Penyaring daftar pembayaran untuk halaman pengurus. */
+export interface PaymentAdminFilter {
+  purpose?: PaymentPurpose
+  status?: string
+}
+
+/** Tampilan publik status satu invoice (halaman hasil pembayaran). */
+export interface PaymentStatusView {
+  invoiceNumber: string
+  purpose: PaymentPurpose
+  status: PaymentStatus
+  amount: number
+  period?: string
+  channel?: string
+  paidAt?: string
+}

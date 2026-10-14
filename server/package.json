@@ -12,7 +12,8 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "tsx src/db/reset.ts",
     "db:setup": "npm run db:migrate && npm run db:seed",
-    "sheets:check": "tsx src/scripts/sheets-check.ts"
+    "sheets:check": "tsx src/scripts/sheets-check.ts",
+    "payments:check": "tsx src/scripts/payments-check.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -12,9 +12,16 @@ import type {
   User,
 } from '@/types'
 import type {
+  AdminPayments,
   AttendanceRow,
   AuthSession,
+  CheckoutInput,
+  CheckoutResult,
   CreateUserInput,
+  MyPayments,
+  PaymentAdminFilter,
+  PaymentConfig,
+  PaymentStatusView,
   SessionInput,
   TreasurySummary,
   UpdateUserAccountInput,
@@ -355,6 +362,8 @@ export const registrationApi = {
     motivation?: string
     consent: boolean
     password: string
+    /** 'cash' = bayar tunai (nanti); 'gateway' = bayar online via DOKU. */
+    paymentMethod?: 'cash' | 'gateway'
   }): Promise<Registration> {
     return request('/registrations', { method: 'POST', body: JSON.stringify(input) })
   },
@@ -366,6 +375,14 @@ export const registrationApi = {
     return request(`/registrations/${encodeURIComponent(id)}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status, internalNote }),
+    })
+  },
+
+  /** Menandai biaya administrasi sudah lunas (mis. bayar tunai). */
+  async setPayment(id: string, paymentStatus: 'belum' | 'lunas'): Promise<Registration> {
+    return request(`/registrations/${encodeURIComponent(id)}/payment`, {
+      method: 'PATCH',
+      body: JSON.stringify({ paymentStatus }),
     })
   },
 }
@@ -392,6 +409,35 @@ export const treasuryApi = {
   },
   async remove(id: string): Promise<void> {
     await request(`/transactions/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  },
+}
+
+/* ------------------------------------------------------------------ */
+/* Pembayaran online (DOKU Checkout)                                   */
+/* ------------------------------------------------------------------ */
+
+export const paymentApi = {
+  async config(): Promise<PaymentConfig> {
+    return request('/payments/config')
+  },
+
+  /** Membuat sesi pembayaran DOKU; mengembalikan URL halaman checkout. */
+  async checkout(input: CheckoutInput): Promise<CheckoutResult> {
+    return request('/payments/checkout', { method: 'POST', body: JSON.stringify(input) })
+  },
+
+  /** Status iuran + riwayat pembayaran milik pengguna yang login. */
+  async mine(): Promise<MyPayments> {
+    return request('/payments/mine')
+  },
+
+  async adminList(filter?: PaymentAdminFilter): Promise<AdminPayments> {
+    return request(`/payments${query({ purpose: filter?.purpose, status: filter?.status })}`)
+  },
+
+  /** Status publik satu invoice (halaman hasil pembayaran). */
+  async status(invoiceNumber: string): Promise<PaymentStatusView> {
+    return request(`/payments/status/${encodeURIComponent(invoiceNumber)}`)
   },
 }
 

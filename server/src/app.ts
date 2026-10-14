@@ -20,6 +20,7 @@ import { syncRouter } from './routes/sync'
 import { transactionRouter } from './routes/transactions'
 import { uploadRouter } from './routes/uploads'
 import { landingRouter } from './routes/landing'
+import { paymentRouter } from './routes/payments'
 import { userRouter } from './routes/users'
 import { uploadDir } from './lib/uploads'
 
@@ -48,6 +49,10 @@ export function createApp() {
     )
   }
 
+  // Webhook DOKU perlu body MENTAH (untuk verifikasi HMAC), jadi route ini
+  // dipasang express.raw SEBELUM express.json() global di bawah.
+  app.use('/api/payments/doku/notification', express.raw({ type: '*/*', limit: '1mb' }))
+
   app.use(express.json({ limit: '1mb' }))
   app.use(cookieParser())
   app.use(
@@ -74,6 +79,7 @@ export function createApp() {
   app.use('/api/announcements', announcementRouter)
   app.use('/api/coaches', coachRouter)
   app.use('/api/registrations', registrationRouter)
+  app.use('/api/payments', paymentRouter)
   app.use('/api/transactions', transactionRouter)
   app.use('/api/audit-logs', auditRouter)
   app.use('/api/uploads', uploadRouter)

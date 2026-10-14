@@ -15,9 +15,18 @@ import { createSeedDatabase, DB_KEY, DB_VERSION, refreshDemoDates } from '@/data
 import { todayISO } from '@/lib/date'
 import { canCheckIn } from '@/lib/session'
 import type {
+  AdminPayments,
   AttendanceRow,
   AuthSession,
+  CheckoutInput,
+  CheckoutResult,
   CreateUserInput,
+  DuesState,
+  MyPayments,
+  Payment,
+  PaymentAdminFilter,
+  PaymentConfig,
+  PaymentStatusView,
   SessionInput,
   TreasurySummary,
   UpdateUserAccountInput,
@@ -510,6 +519,7 @@ export const registrationApi = {
     motivation?: string
     consent: boolean
     password: string
+    paymentMethod?: 'cash' | 'gateway'
   }): Promise<Registration> {
     if (!input.fullName.trim()) return fail('Nama lengkap wajib diisi.')
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) return fail('Format email tidak valid.')
@@ -534,6 +544,8 @@ export const registrationApi = {
           consent: input.consent,
           status: 'baru',
           submittedAt: new Date().toISOString(),
+          paymentMethod: input.paymentMethod,
+          paymentStatus: 'belum',
         }
         db.registrations.push(created)
         return created
@@ -555,6 +567,16 @@ export const registrationApi = {
         }
         r.status = status
         if (internalNote !== undefined) r.internalNote = internalNote
+        return r
+      }),
+    )
+  },
+  async setPayment(id: string, paymentStatus: 'belum' | 'lunas'): Promise<Registration> {
+    return delay(
+      mutate((db) => {
+        const r = db.registrations.find((x) => x.id === id)
+        if (!r) throw new Error('Pendaftaran tidak ditemukan.')
+        r.paymentStatus = paymentStatus
         return r
       }),
     )
@@ -639,6 +661,92 @@ export const treasuryApi = {
         }
       }),
     )
+  },
+}
+
+/* ------------------------------------------------------------------ */
+/* Pembayaran online (mode demo: langsung dianggap lunas)              */
+/* ------------------------------------------------------------------ */
+
+const demoPayments: Payment[] = []
+const DEMO_MONTHLY_DUES = 60000
+const DEMO_REGISTRATION_FEE = 50000
+
+function periodNow(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+export const paymentApi = {
+  async config(): Promise<PaymentConfig> {
+    return delay({
+      configured: true,
+      registrationFee: DEMO_REGISTRATION_FEE,
+      monthlyDues: DEMO_MONTHLY_DUES,
+      period: periodNow(),
+    })
+  },
+  async checkout(input: CheckoutInput): Promise<CheckoutResult> {
+    const period = input.period ?? periodNow()
+    const amount =
+      input.purpose === 'pendaftaran'
+        ? DEMO_REGISTRATION_FEE
+        : Math.max(1, Math.min(input.amount ?? DEMO_MONTHLY_DUES, DEMO_MONTHLY_DUES))
+    const created: Payment = {
+      id: uid('pay'),
+      purpose: input.purpose,
+      status: 'paid',
+      amount,
+      invoiceNumber: `DEMO${Date.now().toString(36).toUpperCase()}`,
+      registrationId: input.registrationId,
+      period: input.purpose === 'iuran' ? period : undefined,
+      payerName: '',
+      payerEmail: input.email ?? '',
+      payerPhone: '',
+      paidAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    demoPayments.unshift(created)
+    return delay({ ...created, url: undefined, reused: false })
+  },
+  async mine(): Promise<MyPayments> {
+    const period = periodNow()
+    const paid = demoPayments
+      .filter((p) => p.purpose === 'iuran' && p.status === 'paid' && p.period === period)
+      .reduce((sum, p) => sum + p.amount, 0)
+    const outstanding = Math.max(0, DEMO_MONTHLY_DUES - paid)
+    const dues: DuesState = {
+      period,
+      monthlyAmount: DEMO_MONTHLY_DUES,
+      paidAmount: paid,
+      outstanding,
+      status: outstanding <= 0 ? 'lunas' : paid > 0 ? 'sebagian' : 'belum',
+    }
+    return delay({ dues, payments: [...demoPayments] })
+  },
+  async adminList(filter?: PaymentAdminFilter): Promise<AdminPayments> {
+    const payments = demoPayments.filter(
+      (p) =>
+        (!filter?.purpose || p.purpose === filter.purpose) &&
+        (!filter?.status || p.status === filter.status),
+    )
+    const paid = payments.filter((p) => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+    const pending = payments.filter((p) => p.status === 'pending').reduce((s, p) => s + p.amount, 0)
+    return delay({ payments: [...payments], totals: { paid, pending } })
+  },
+  async status(invoiceNumber: string): Promise<PaymentStatusView> {
+    const p = demoPayments.find((x) => x.invoiceNumber === invoiceNumber)
+    if (!p) return fail('Pembayaran tidak ditemukan.', 404)
+    return delay({
+      invoiceNumber: p.invoiceNumber,
+      purpose: p.purpose,
+      status: p.status,
+      amount: p.amount,
+      period: p.period,
+      channel: p.channel,
+      paidAt: p.paidAt,
+    })
   },
 }
 
