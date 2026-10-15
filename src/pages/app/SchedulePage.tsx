@@ -256,7 +256,7 @@ export function SchedulePage() {
         </>
       )}
 
-      {isAdmin || isCoach && (
+      {(isAdmin || isCoach) && (
         <>
           <Modal
             open={formOpen}
