@@ -67,13 +67,15 @@ export function PaymentStatusPage() {
   const [loading, setLoading] = useState(Boolean(invoice))
 
   const load = useCallback(async () => {
-    if (!invoice) return
+    if (!invoice) return null
     try {
       const view = await paymentApi.status(invoice)
       setState(view)
       setError(null)
+      return view
     } catch (err) {
       setError(errorMessage(err))
+      return null
     } finally {
       setLoading(false)
     }
@@ -86,8 +88,10 @@ export function PaymentStatusPage() {
 
     const tick = async () => {
       if (!active) return
-      await load()
+      const view = await load()
       if (!active) return
+      // Berhenti polling begitu status final (paid/expired/failed).
+      if (view && view.status !== 'pending') return
       timer = setTimeout(() => void tick(), 5000)
     }
     void tick()
@@ -97,11 +101,6 @@ export function PaymentStatusPage() {
       if (timer) clearTimeout(timer)
     }
   }, [invoice, load])
-
-  // Berhenti polling saat status final.
-  useEffect(() => {
-    if (state && state.status !== 'pending') setLoading(false)
-  }, [state])
 
   const view = state ? presentation(state.status) : null
 

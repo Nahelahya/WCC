@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { paymentApi, registrationApi } from '@/api/client'
 import type { PaymentConfig } from '@/api/types'
 import { errorMessage } from '@/lib/hooks'
+import { newIdempotencyKey, isConflictError } from '@/lib/idempotency'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button, buttonClasses } from '@/components/ui/Button'
 import { Checkbox, Input, Select, Textarea } from '@/components/ui/Field'
@@ -69,6 +70,7 @@ export function RegisterPage() {
   // Konfigurasi pembayaran: nominal + apakah DOKU sudah aktif di server.
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null)
   const [paying, setPaying] = useState(false)
+  const payingRef = useRef(false)
   const [payError, setPayError] = useState<string | null>(null)
   const [paidOnline, setPaidOnline] = useState(false)
   const [payDeferred, setPayDeferred] = useState(false)
@@ -202,26 +204,37 @@ export function RegisterPage() {
   }
 
   /** Membuat sesi pembayaran DOKU untuk biaya administrasi pendaftaran. */
-  async function onPayRegistration() {
-    if (!result || paying) return
+  async function onPayRegistration(key = newIdempotencyKey(), retried = false) {
+    if (!result || payingRef.current || paying) return
     setPayError(null)
+    payingRef.current = true
     setPaying(true)
     try {
       const res = await paymentApi.checkout({
         purpose: 'pendaftaran',
         registrationId: result.id,
         email: result.email,
+        idempotencyKey: key,
       })
       if (res.url) {
         window.location.href = res.url // arahkan ke halaman pembayaran DOKU
         return
       }
       setPaying(false)
+      payingRef.current = false
       if (res.status === 'paid') setPaidOnline(true)
       else setPayError('Tautan pembayaran belum tersedia. Silakan coba lagi.')
     } catch (err) {
+      // Kunci dipakai sesi kedaluwarsa: ulangi sekali dengan kunci baru.
+      if (!retried && isConflictError(err)) {
+        payingRef.current = false
+        setPaying(false)
+        await onPayRegistration(newIdempotencyKey(), true)
+        return
+      }
       setPayError(errorMessage(err))
       setPaying(false)
+      payingRef.current = false
     }
   }
 

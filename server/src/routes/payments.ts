@@ -62,8 +62,10 @@ function invoiceNumberFor(purpose: 'pendaftaran' | 'iuran'): string {
   const stamp =
     `${now.getUTCFullYear()}` +
     `${String(now.getUTCMonth() + 1).padStart(2, '0')}` +
-    `${String(now.getUTCDate()).padStart(2, '0')}`
-  const rand = crypto.randomBytes(3).toString('hex').toUpperCase()
+    `${String(now.getUTCDate()).padStart(2, '0')}` +
+    `${String(now.getUTCHours()).padStart(2, '0')}` +
+    `${String(now.getUTCMinutes()).padStart(2, '0')}`
+  const rand = crypto.randomBytes(4).toString('hex').toUpperCase()
   return `WCC${purposeCode(purpose)}${stamp}${rand}`
 }
 
@@ -181,6 +183,15 @@ const checkoutSchema = z.object({
   email: z.string().trim().email('Format email tidak valid.').optional(),
   period: z.string().regex(/^\d{4}-\d{2}$/, 'Periode tidak valid.').optional(),
   amount: z.coerce.number().positive('Nominal harus lebih dari 0.').optional(),
+  // Kunci idempotensi dari klien (satu per niat bayar). Tanpa ini, pengulangan
+  // permintaan tetap ditangani lewat pemakaian ulang tautan pending yang cocok.
+  idempotencyKey: z
+    .string()
+    .trim()
+    .min(8, 'Kunci idempotensi tidak valid.')
+    .max(128, 'Kunci idempotensi tidak valid.')
+    .regex(/^[A-Za-z0-9_-]+$/, 'Kunci idempotensi tidak valid.')
+    .optional(),
 })
 
 paymentRouter.post(
@@ -190,6 +201,17 @@ paymentRouter.post(
       throw ApiError.serviceUnavailable('Pembayaran online belum diaktifkan pengurus.')
     }
     const input = checkoutSchema.parse(req.body ?? {})
+    // Idempotensi: kunci yang sama dikembalikan invoice yang sama.
+    if (input.idempotencyKey) {
+      const prev = await findByIdempotencyKey(input.idempotencyKey)
+      if (prev) {
+        if (prev.status === 'paid' || isPendingReusable(prev)) {
+          res.json({ ...mapPayment(prev), url: prev.doku_url ?? undefined, reused: true })
+          return
+        }
+        throw ApiError.conflict('Sesi pembayaran sebelumnya sudah tidak berlaku. Silakan ulangi pembayaran.')
+      }
+    }
     if (input.purpose === 'pendaftaran') {
       res.json(await startRegistrationPayment(input))
       return
@@ -204,6 +226,23 @@ interface CheckoutInput {
   email?: string
   period?: string
   amount?: number
+  idempotencyKey?: string
+}
+
+/** Mencari pembayaran berdasarkan kunci idempotensi (bila klien mengirimnya). */
+async function findByIdempotencyKey(key: string): Promise<PaymentRow | undefined> {
+  const { rows } = await query<PaymentRow>(
+    `select ${PAYMENT_COLUMNS} from payments where idempotency_key = $1`,
+    [key],
+  )
+  return rows[0]
+}
+
+/** True bila tautan pending masih berlaku untuk dipakai ulang. */
+function isPendingReusable(p: PaymentRow): boolean {
+  if (p.status !== 'pending' || !p.doku_url) return false
+  if (!p.expires_at) return false
+  return new Date(p.expires_at).getTime() > Date.now()
 }
 
 /** Pembayaran biaya administrasi pendaftaran (boleh diakses tanpa login). */
@@ -245,15 +284,31 @@ async function startRegistrationPayment(input: CheckoutInput) {
 
   const id = newId('pay')
   const invoiceNumber = invoiceNumberFor('pendaftaran')
-  const inserted = await query<PaymentRow>(
-    `insert into payments
-       (id, purpose, status, amount, invoice_number, registration_id, payer_name, payer_email, payer_phone, expires_at)
-     values ($1, 'pendaftaran', 'pending', $2, $3, $4, $5, $6, $7, now() + make_interval(mins => $8))
-     returning ${PAYMENT_COLUMNS}`,
-    [id, amount, invoiceNumber, reg.id, reg.full_name, reg.email, reg.phone, 60],
-  )
+  let inserted
+  try {
+    inserted = await query<PaymentRow>(
+      `insert into payments
+         (id, purpose, status, amount, invoice_number, registration_id, payer_name, payer_email, payer_phone, expires_at, idempotency_key)
+       values ($1, 'pendaftaran', 'pending', $2, $3, $4, $5, $6, $7, now() + make_interval(mins => $8), $9)
+       returning ${PAYMENT_COLUMNS}`,
+      [id, amount, invoiceNumber, reg.id, reg.full_name, reg.email, reg.phone, 60, input.idempotencyKey ?? null],
+    )
+  } catch (error) {
+    // Balapan dua permintaan berkunci sama: yang kalah memakai baris pemenang.
+    if (input.idempotencyKey && (error as { code?: string })?.code === '23505') {
+      const prev = await findByIdempotencyKey(input.idempotencyKey)
+      if (prev) return { ...mapPayment(prev), url: prev.doku_url ?? undefined, reused: true }
+    }
+    throw error
+  }
   try {
     const started = await createSessionFor(id, invoiceNumber, 'Biaya administrasi pendaftaran WCC', 60)
+    // Selaraskan metode bayar: niat bayar online tercatat sebagai 'gateway'
+    // agar tampilan pengurus tetap benar walau pendaftar awalnya memilih tunai.
+    await query(
+      `update registrations set payment_method = 'gateway' where id = $1 and payment_method is distinct from 'gateway'`,
+      [reg.id],
+    ).catch(() => {})
     return { ...mapPayment(started.payment ?? inserted.rows[0]), url: started.url }
   } catch (error) {
     await query(`update payments set status = 'failed', updated_at = now() where id = $1`, [id]).catch(() => {})
@@ -298,15 +353,38 @@ async function startDuesPayment(req: { auth?: { userId: string; role: string } }
   const user = users[0]
   if (!user) throw ApiError.unauthorized('Akun tidak ditemukan.')
 
+  // Idempotensi alami: tautan pending yang cocok dipakai ulang agar klik ganda
+  // / retry tidak menciptakan invoice baru untuk cicilan yang sama.
+  const { rows: reusable } = await query<PaymentRow>(
+    `select ${PAYMENT_COLUMNS} from payments
+      where purpose = 'iuran' and status = 'pending' and user_id = $1 and period = $2
+        and amount = $3 and expires_at > now() and doku_url is not null
+      order by created_at desc limit 1`,
+    [userId, period, amount],
+  )
+  if (reusable[0]?.doku_url) {
+    return { ...mapPayment(reusable[0]), url: reusable[0].doku_url, reused: true }
+  }
+
   const id = newId('pay')
   const invoiceNumber = invoiceNumberFor('iuran')
-  const inserted = await query<PaymentRow>(
-    `insert into payments
-       (id, purpose, status, amount, invoice_number, user_id, period, payer_name, payer_email, payer_phone, expires_at)
-     values ($1, 'iuran', 'pending', $2, $3, $4, $5, $6, $7, $8, now() + make_interval(mins => $9))
-     returning ${PAYMENT_COLUMNS}`,
-    [id, amount, invoiceNumber, userId, period, user.name, user.email, user.phone, 60],
-  )
+  let inserted
+  try {
+    inserted = await query<PaymentRow>(
+      `insert into payments
+         (id, purpose, status, amount, invoice_number, user_id, period, payer_name, payer_email, payer_phone, expires_at, idempotency_key)
+       values ($1, 'iuran', 'pending', $2, $3, $4, $5, $6, $7, $8, now() + make_interval(mins => $9), $10)
+       returning ${PAYMENT_COLUMNS}`,
+      [id, amount, invoiceNumber, userId, period, user.name, user.email, user.phone, 60, input.idempotencyKey ?? null],
+    )
+  } catch (error) {
+    // Balapan dua permintaan berkunci sama: yang kalah memakai baris pemenang.
+    if (input.idempotencyKey && (error as { code?: string })?.code === '23505') {
+      const prev = await findByIdempotencyKey(input.idempotencyKey)
+      if (prev) return { ...mapPayment(prev), url: prev.doku_url ?? undefined, reused: true }
+    }
+    throw error
+  }
   try {
     const started = await createSessionFor(
       id,
@@ -329,18 +407,18 @@ interface DokuNotificationBody {
   channel?: { id?: string; name?: string }
 }
 
-function headerValue(req: { header(name: string): string | undefined }, name: string): string | undefined {
-  return req.header(name)
-}
-
-async function applyPaid(paymentId: string, payload: unknown): Promise<PaymentRow | null> {
+async function applyPaid(paymentId: string, payload: DokuNotificationBody): Promise<PaymentRow | null> {
   const applied = await withTransaction(async (client) => {
+    // Simpan kanal aktual dari gateway (mis. "VIRTUAL_ACCOUNT / BCA ...")
+    // agar daftar pengurus menampilkan metode yang benar-benar dipakai.
+    const channel = [payload.channel?.id, payload.channel?.name].filter(Boolean).join(' / ') || null
     const { rows } = await client.query<PaymentRow>(
       `update payments
-          set status = 'paid', paid_at = now(), notification = $2, updated_at = now()
+          set status = 'paid', paid_at = now(), channel = coalesce($3, channel),
+              notification = $2, updated_at = now()
         where id = $1 and status <> 'paid'
         returning ${PAYMENT_COLUMNS}`,
-      [paymentId, JSON.stringify(payload)],
+      [paymentId, JSON.stringify(payload), channel],
     )
     const p = rows[0]
     if (!p) return null
@@ -392,10 +470,10 @@ paymentRouter.post(
         ? req.body
         : ''
     const headers = {
-      clientId: headerValue(req, 'client-id'),
-      requestId: headerValue(req, 'request-id'),
-      requestTimestamp: headerValue(req, 'request-timestamp'),
-      signature: headerValue(req, 'signature'),
+      clientId: req.header('client-id'),
+      requestId: req.header('request-id'),
+      requestTimestamp: req.header('request-timestamp'),
+      signature: req.header('signature'),
     }
 
     if (!rawBody || !verifyDokuNotification(rawBody, headers, notificationTargetPath())) {
@@ -627,6 +705,11 @@ paymentRouter.put(
     const today = todayISO()
 
     await withTransaction(async (client) => {
+      // Kunci penasihat per (anggota, periode) agar dua penyimpanan tunai yang
+      // bersamaan tidak menciptakan baris ganda — PUT tetap idempoten.
+      await client.query('select pg_advisory_xact_lock(hashtext($1)::bigint)', [
+        `manual-dues:${input.userId}:${input.period}`,
+      ])
       const { rows: existing } = await client.query<PaymentRow>(
         `select ${PAYMENT_COLUMNS} from payments
           where purpose = 'iuran' and channel = 'cash' and user_id = $1 and period = $2
