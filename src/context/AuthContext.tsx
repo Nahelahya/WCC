@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react'
 import type { User } from '@/types'
 import { authApi } from '@/api/client'
+import { clearActivityMark, markActivityNow } from '@/lib/hooks'
 
 interface AuthContextValue {
   user: User | null
@@ -37,13 +38,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const session = await authApi.login(email, password)
+    // Mulai hitungan "tidak ada kegiatan" dari sekarang.
+    markActivityNow()
     setUserState(session.user)
     return session.user
   }, [])
 
   const logout = useCallback(async () => {
-    await authApi.logout()
-    setUserState(null)
+    // Sesi lokal WAJIB berakhir walau permintaan keluar ke server gagal
+    // (mis. jaringan putus): kalau tidak, auto-logout karena menganggur
+    // tampak "tidak jalan" karena pengguna tetap dianggap masuk.
+    try {
+      await authApi.logout()
+    } catch {
+      /* abaikan kegagalan jaringan — sesi lokal tetap diakhiri */
+    } finally {
+      clearActivityMark()
+      setUserState(null)
+    }
   }, [])
 
   const value = useMemo<AuthContextValue>(

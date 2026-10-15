@@ -70,24 +70,83 @@ export function sleep(ms: number): Promise<void> {
 export const IDLE_LOGOUT_FLAG = 'wcc_idle_logout'
 
 /**
+ * Waktu aktivitas terakhir pengguna (epoch ms) yang disimpan di localStorage.
+ * Disimpan agar hitungan "tidak ada kegiatan" tetap benar setelah halaman
+ * di-reload atau tab dibuang peramban — sebelumnya timer selalu direset saat
+ * halaman dimuat ulang sehingga sesi menganggur seakan tidak pernah berakhir.
+ */
+const LAST_ACTIVITY_KEY = 'wcc_last_activity'
+
+/** Menandai aktivitas pengguna saat ini (dipanggil saat login dan saat ada interaksi). */
+export function markActivityNow(): void {
+  try {
+    window.localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()))
+  } catch {
+    // localStorage bisa diblokir; hitungan idle tetap berjalan di memori.
+  }
+}
+
+/** Menghapus tanda aktivitas agar sesi berikutnya menghitung dari awal. */
+export function clearActivityMark(): void {
+  try {
+    window.localStorage.removeItem(LAST_ACTIVITY_KEY)
+  } catch {
+    /* abaikan */
+  }
+}
+
+function readLastActivity(): number {
+  try {
+    return Number(window.localStorage.getItem(LAST_ACTIVITY_KEY) ?? 0) || 0
+  } catch {
+    return 0
+  }
+}
+
+/**
  * Memanggil `onIdle` setelah tidak ada aktivitas pengguna selama `timeoutMs`.
  *
  * Aktivitas yang dihitung: gerakan/klik mouse, ketikan keyboard, gulir, dan
- * sentuhan layar. Pemeriksaan dilakukan berkala sehingga tetap berjalan walau
- * tab sempat tidak aktif (browser menahan timer di latar belakang).
+ * sentuhan layar. Waktu aktivitas terakhir disimpan di localStorage sehingga
+ * hitungan tidak tereset saat halaman di-reload atau tab dibuang peramban.
+ * Pemeriksaan dilakukan berkala (peramban menahan timer di latar belakang) dan
+ * setiap kali tab kembali terlihat.
  */
 export function useIdleLogout(timeoutMs: number, onIdle: () => void) {
   const onIdleRef = useRef(onIdle)
   onIdleRef.current = onIdle
 
   useEffect(() => {
-    let last = Date.now()
+    let last = readLastActivity()
+    if (!last) {
+      last = Date.now()
+      markActivityNow()
+    }
+
+    let fired = false
+    const fire = () => {
+      if (fired) return
+      fired = true
+      onIdleRef.current()
+    }
+
+    let persistedAt = last
     const markActive = () => {
       last = Date.now()
+      // `mousemove` terlalu sering untuk ditulis ke localStorage tiap kali;
+      // cukup simpan berkala agar hitungan tetap akurat setelah reload.
+      if (last - persistedAt >= 5_000) {
+        persistedAt = last
+        markActivityNow()
+      }
     }
     const check = () => {
-      if (Date.now() - last >= timeoutMs) onIdleRef.current()
+      if (Date.now() - last >= timeoutMs) fire()
     }
+
+    // Periksa segera saat mount: menangkap halaman yang dibuka kembali setelah
+    // lama menganggur (reload / tab dibuang peramban) sebelum pengguna berinteraksi.
+    check()
 
     const events: Array<keyof WindowEventMap> = [
       'mousemove',
@@ -101,9 +160,22 @@ export function useIdleLogout(timeoutMs: number, onIdle: () => void) {
     events.forEach((name) => window.addEventListener(name, markActive, { passive: true }))
     const interval = window.setInterval(check, 30_000)
 
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') check()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    // Sinkronkan aktivitas antar-tab yang terbuka bersamaan.
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === LAST_ACTIVITY_KEY && event.newValue) last = Number(event.newValue) || last
+    }
+    window.addEventListener('storage', onStorage)
+
     return () => {
       window.clearInterval(interval)
       events.forEach((name) => window.removeEventListener(name, markActive))
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('storage', onStorage)
     }
   }, [timeoutMs])
 }
