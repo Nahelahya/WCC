@@ -10,6 +10,7 @@ import { sendMail } from '../lib/mailer'
 import { emailVerifyOtpEmail, registrationDecisionEmail, registrationReceivedEmail } from '../lib/emails'
 import { generateOtp, hashOtp } from '../lib/otp'
 import { requireAuth, requireRole } from '../middleware/auth'
+import { dokuConfigured } from '../lib/doku'
 
 export const registrationRouter = Router()
 
@@ -47,6 +48,11 @@ registrationRouter.post(
   '/',
   wrap(async (req, res) => {
     const input = submitSchema.parse(req.body ?? {})
+    // Tolak pilihan "online" bila gateway belum dikonfigurasi — klien bisa
+    // saja mengirimkannya karena balapan dengan pemuatan /payments/config.
+    if (input.paymentMethod === 'gateway' && !dokuConfigured()) {
+      throw ApiError.badRequest('Pembayaran online belum tersedia. Pilih pembayaran tunai atau coba lagi nanti.')
+    }
     const { rows } = await query<RegistrationRow>(
       `insert into registrations
          (id, full_name, email, phone, gender, nik, address, medical_history,

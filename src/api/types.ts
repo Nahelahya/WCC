@@ -111,6 +111,12 @@ export interface CheckoutInput {
   email?: string
   period?: string
   amount?: number
+  /**
+   * Kunci idempotensi unik (UUID) per niat bayar. Bila permintaan yang sama
+   * diulang (klik ganda / retry), server mengembalikan invoice yang sama
+   * alih-alih membuat invoice baru.
+   */
+  idempotencyKey?: string
 }
 
 /** Hasil endpoint checkout: ringkasan pembayaran + URL halaman DOKU. */

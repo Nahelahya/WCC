@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { paymentApi } from '@/api/client'
 import { useAsync, errorMessage } from '@/lib/hooks'
+import { newIdempotencyKey, isConflictError } from '@/lib/idempotency'
 import { useToast } from '@/context/ToastContext'
 import { PageHeader, SectionHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
@@ -39,13 +40,15 @@ export function DuesPage() {
 
   const [rawAmount, setRawAmount] = useState('')
   const [paying, setPaying] = useState(false)
+  // Cermin ref agar klik ganda dalam satu tick render tetap tertahan.
+  const payingRef = useRef(false)
 
   const digits = rawAmount.replace(/\D/g, '')
   const requested = rawAmount.trim() === '' ? outstanding : Math.floor(Number(digits))
   const configured = config.data?.configured ?? false
 
-  async function pay(amount: number) {
-    if (paying || !dues) return
+  async function pay(amount: number, key = newIdempotencyKey(), retried = false) {
+    if (payingRef.current || paying || !dues) return
     if (amount <= 0) {
       toast('Nominal pembayaran harus lebih dari 0.', 'warning')
       return
@@ -54,9 +57,15 @@ export function DuesPage() {
       toast(`Sisa iuran periode ini hanya ${rupiah(outstanding)}.`, 'warning')
       return
     }
+    payingRef.current = true
     setPaying(true)
     try {
-      const res = await paymentApi.checkout({ purpose: 'iuran', period: dues.period, amount })
+      const res = await paymentApi.checkout({
+        purpose: 'iuran',
+        period: dues.period,
+        amount,
+        idempotencyKey: key,
+      })
       if (res.url) {
         window.location.href = res.url // lanjut ke halaman pembayaran DOKU
         return
@@ -64,8 +73,16 @@ export function DuesPage() {
       toast('Pembayaran dicatat sebagai lunas.', 'success')
       mine.reload()
     } catch (err) {
+      // Kunci dipakai sesi kedaluwarsa: ulangi sekali dengan kunci baru.
+      if (!retried && isConflictError(err)) {
+        payingRef.current = false
+        setPaying(false)
+        await pay(amount, newIdempotencyKey(), true)
+        return
+      }
       toast(errorMessage(err), 'error')
     } finally {
+      payingRef.current = false
       setPaying(false)
     }
   }
