@@ -45,16 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
-    // Sesi lokal WAJIB berakhir walau permintaan keluar ke server gagal
-    // (mis. jaringan putus): kalau tidak, auto-logout karena menganggur
-    // tampak "tidak jalan" karena pengguna tetap dianggap masuk.
+    // Akhiri sesi lokal SEGERA, tanpa menunggu server: di jaringan ponsel
+    // permintaan bisa menggantung lama, dan auto-logout harus tampak langsung.
+    clearActivityMark()
+    setUserState(null)
     try {
       await authApi.logout()
     } catch {
-      /* abaikan kegagalan jaringan — sesi lokal tetap diakhiri */
-    } finally {
-      clearActivityMark()
-      setUserState(null)
+      /* abaikan kegagalan jaringan — sesi lokal sudah diakhiri */
     }
   }, [])
 

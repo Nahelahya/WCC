@@ -106,11 +106,14 @@ function readLastActivity(): number {
 /**
  * Memanggil `onIdle` setelah tidak ada aktivitas pengguna selama `timeoutMs`.
  *
- * Aktivitas yang dihitung: gerakan/klik mouse, ketikan keyboard, gulir, dan
- * sentuhan layar. Waktu aktivitas terakhir disimpan di localStorage sehingga
- * hitungan tidak tereset saat halaman di-reload atau tab dibuang peramban.
- * Pemeriksaan dilakukan berkala (peramban menahan timer di latar belakang) dan
- * setiap kali tab kembali terlihat.
+ * Aktivitas yang dihitung: gerakan/klik/sentuh, ketikan keyboard, dan gulir.
+ * Waktu aktivitas terakhir disimpan di localStorage sehingga hitungan tidak
+ * tereset saat halaman di-reload, tab dibuang, atau dipulihkan dari cache.
+ *
+ * Peramban ponsel sering membekukan timer saat aplikasi/tab tidak aktif dan
+ * tidak selalu memicu `visibilitychange`; karena itu pemeriksaan juga dilakukan
+ * pada semua event siklus hidup (visible/focus/pageshow/resume) dan setiap kali
+ * keluar halaman waktu aktivitas dicatat agar hitungan idle tetap akurat.
  */
 export function useIdleLogout(timeoutMs: number, onIdle: () => void) {
   const onIdleRef = useRef(onIdle)
@@ -130,18 +133,28 @@ export function useIdleLogout(timeoutMs: number, onIdle: () => void) {
       onIdleRef.current()
     }
 
+    // Aktivitas terbaru diambil dari nilai terbesar antara memori dan
+    // localStorage, agar tetap benar setelah halaman dibekukan/dipulihkan.
+    const effectiveLast = () => Math.max(last, readLastActivity())
+
     let persistedAt = last
     const markActive = () => {
       last = Date.now()
-      // `mousemove` terlalu sering untuk ditulis ke localStorage tiap kali;
-      // cukup simpan berkala agar hitungan tetap akurat setelah reload.
+      // `mousemove`/`touchmove` terlalu sering untuk ditulis ke localStorage
+      // tiap kali; cukup simpan berkala agar hitungan tetap akurat setelah reload.
       if (last - persistedAt >= 5_000) {
         persistedAt = last
         markActivityNow()
       }
     }
+    // Dipakai saat halaman ditinggalkan: catat waktunya segera (tanpa throttle).
+    const recordNow = () => {
+      last = Date.now()
+      persistedAt = last
+      markActivityNow()
+    }
     const check = () => {
-      if (Date.now() - last >= timeoutMs) fire()
+      if (Date.now() - effectiveLast() >= timeoutMs) fire()
     }
 
     // Periksa segera saat mount: menangkap halaman yang dibuka kembali setelah
@@ -151,19 +164,33 @@ export function useIdleLogout(timeoutMs: number, onIdle: () => void) {
     const events: Array<keyof WindowEventMap> = [
       'mousemove',
       'mousedown',
+      'pointerdown',
       'keydown',
       'scroll',
       'wheel',
       'touchstart',
+      'touchmove',
       'click',
     ]
     events.forEach((name) => window.addEventListener(name, markActive, { passive: true }))
     const interval = window.setInterval(check, 30_000)
 
-    const onVisible = () => {
+    const onVisibility = () => {
       if (document.visibilityState === 'visible') check()
+      else recordNow()
     }
-    document.addEventListener('visibilitychange', onVisible)
+    document.addEventListener('visibilitychange', onVisibility)
+
+    // Jalur pemulihan yang lazim di ponsel: fokus kembali, pulih dari cache
+    // (bfcache) via `pageshow`, atau dilanjutkan dari kondisi beku (`resume`).
+    const onResume = () => check()
+    window.addEventListener('focus', onResume)
+    window.addEventListener('pageshow', onResume)
+    document.addEventListener('resume', onResume)
+
+    // Saat meninggalkan halaman, simpan waktu aktivitas terakhir segera.
+    window.addEventListener('pagehide', recordNow)
+    document.addEventListener('freeze', recordNow)
 
     // Sinkronkan aktivitas antar-tab yang terbuka bersamaan.
     const onStorage = (event: StorageEvent) => {
@@ -174,7 +201,12 @@ export function useIdleLogout(timeoutMs: number, onIdle: () => void) {
     return () => {
       window.clearInterval(interval)
       events.forEach((name) => window.removeEventListener(name, markActive))
-      document.removeEventListener('visibilitychange', onVisible)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', onResume)
+      window.removeEventListener('pageshow', onResume)
+      document.removeEventListener('resume', onResume)
+      window.removeEventListener('pagehide', recordNow)
+      document.removeEventListener('freeze', recordNow)
       window.removeEventListener('storage', onStorage)
     }
   }, [timeoutMs])
