@@ -107,6 +107,14 @@ export async function runSync(trigger: 'manual' | 'scheduled'): Promise<SyncRunR
     const cfg = getSheetsConfig()
     const { rows } = await query<TransactionRow>('select * from transactions order by date asc, created_at asc')
 
+    const income = rows
+      .filter((r) => r.type === 'pemasukan')
+      .reduce((s, r) => s + Number(r.amount), 0)
+    const expense = rows
+      .filter((r) => r.type === 'pengeluaran')
+      .reduce((s, r) => s + Number(r.amount), 0)
+    const balance = income - expense
+
     const values: (string | number)[][] = [
       [...SYNC_COLUMNS],
       ...rows.map((row) => [
@@ -117,12 +125,17 @@ export async function runSync(trigger: 'manual' | 'scheduled'): Promise<SyncRunR
         row.note,
         row.recorded_by,
       ]),
+      [],
+      ['RINGKASAN', '', '', '', '', ''],
+      ['Total Pemasukan', '', '', income, '', ''],
+      ['Total Pengeluaran', '', '', expense, '', ''],
+      ['Saldo (Pemasukan - Pengeluaran)', '', '', balance, '', ''],
     ]
 
     const { readBack } = await syncSheet(cfg, values)
 
-    // Rekonsiliasi: bandingkan jumlah baris dan total nominal.
-    const readBackRows = readBack.slice(1).filter((line) => (line[0] ?? '').trim() !== '')
+    // Rekonsiliasi: hanya baris transaksi (tanpa baris ringkasan).
+    const readBackRows = readBack.slice(1, 1 + rows.length).filter((line) => (line[0] ?? '').trim() !== '')
     const expectedTotal = rows.reduce((sum, row) => sum + Number(row.amount), 0)
     const actualTotal = readBackRows.reduce((sum, line) => sum + Number(line[3] ?? 0), 0)
     const reconciled = readBackRows.length === rows.length && Math.abs(actualTotal - expectedTotal) < 0.01
@@ -140,7 +153,7 @@ export async function runSync(trigger: 'manual' | 'scheduled'): Promise<SyncRunR
     const total = expectedTotal.toLocaleString('id-ID')
     const message =
       `Sinkron ${trigger === 'scheduled' ? 'terjadwal' : 'manual'} ke "${cfg.tab}" berhasil: ` +
-      `${rows.length} baris, total Rp${total} cocok.`
+      `${rows.length} baris, total Rp${total} cocok. Saldo: Rp${balance.toLocaleString('id-ID')}.`
     await writeLog('success', message, rows.length)
     await setState('success', at)
 
