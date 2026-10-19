@@ -21,7 +21,7 @@
       // (sekali jalan; tidak mengulang).
       (function () {
         try {
-          if (sessionStorage.getItem('wcc_sw_cleared')) return
+          if (localStorage.getItem('wcc_sw_cleanup_v1')) return
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function (regs) {
               var had = regs.length > 0
@@ -31,15 +31,13 @@
                   keys.forEach(function (k) { caches.delete(k) })
                 })
               }
-              if (had) {
-                sessionStorage.setItem('wcc_sw_cleared', '1')
-                window.location.reload()
-              } else {
-                sessionStorage.setItem('wcc_sw_cleared', '1')
-              }
-            }).catch(function () {})
+              localStorage.setItem('wcc_sw_cleanup_v1', '1')
+              if (had) window.location.reload()
+            }).catch(function () {
+              localStorage.setItem('wcc_sw_cleanup_v1', '1')
+            })
           } else {
-            sessionStorage.setItem('wcc_sw_cleared', '1')
+            localStorage.setItem('wcc_sw_cleanup_v1', '1')
           }
         } catch (e) {}
       })()
