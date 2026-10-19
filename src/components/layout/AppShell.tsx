@@ -111,7 +111,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
   )
 }
 
-export function AppPageHeaderActions({ children }: { children: ReactNode }) {
+function AppPageHeaderActions({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-center gap-2">{children}</div>
 }
 
@@ -124,4 +124,4 @@ export function BackLink({ to, label }: { to: string; label: string }) {
   )
 }
 
-export { Button }
+{ Button }

@@ -1,4 +1,4 @@
-export interface LandingHero {
+interface LandingHero {
   title: string
   subtitle: string
   ctaPrimaryLabel: string
@@ -8,28 +8,28 @@ export interface LandingHero {
   imageUrl?: string
 }
 
-export interface LandingAbout {
+interface LandingAbout {
   badge: string
   title: string
   description: string
   stats: Array<{ label: string; value: string }>
 }
 
-export interface LandingScheduleItem {
+interface LandingScheduleItem {
   day: string
   time: string
   activity: string
   note?: string
 }
 
-export interface LandingSchedule {
+interface LandingSchedule {
   badge: string
   title: string
   description: string
   items: LandingScheduleItem[]
 }
 
-export interface LandingCoachItem {
+interface LandingCoachItem {
   id?: string
   name: string
   expertise: string[]
@@ -37,19 +37,19 @@ export interface LandingCoachItem {
   photoUrl?: string
 }
 
-export interface LandingCoaches {
+interface LandingCoaches {
   badge: string
   title: string
   description: string
   items: LandingCoachItem[]
 }
 
-export interface LandingStepItem {
+interface LandingStepItem {
   title: string
   desc: string
 }
 
-export interface LandingSteps {
+interface LandingSteps {
   badge: string
   title: string
   description?: string
@@ -63,14 +63,14 @@ export interface LandingActivityItem {
   imageUrl?: string
 }
 
-export interface LandingActivities {
+interface LandingActivities {
   badge: string
   title: string
   description: string
   items: LandingActivityItem[]
 }
 
-export interface LandingCta {
+interface LandingCta {
   title: string
   description: string
   ctaPrimaryLabel: string
@@ -79,24 +79,24 @@ export interface LandingCta {
   ctaSecondaryHref: string
 }
 
-export interface LandingFooterContact {
+interface LandingFooterContact {
   address: string
   email: string
   phone: string
 }
 
-export interface LandingFooterLink {
+interface LandingFooterLink {
   label: string
   href: string
   external?: boolean
 }
 
-export interface LandingFooterSection {
+interface LandingFooterSection {
   title: string
   links: LandingFooterLink[]
 }
 
-export interface LandingFooter {
+interface LandingFooter {
   description: string
   contact: LandingFooterContact
   sections: LandingFooterSection[]

@@ -18,7 +18,7 @@ interface FieldProps {
   className?: string
 }
 
-export function Field({ label, htmlFor, required, helper, error, children, className }: FieldProps) {
+function Field({ label, htmlFor, required, helper, error, children, className }: FieldProps) {
   return (
     <div className={cn('w-full', className)}>
       <label className="field-label" htmlFor={htmlFor}>

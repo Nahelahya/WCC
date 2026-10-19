@@ -3,7 +3,7 @@ import { cn } from '@/lib/session'
 import { Icon, type IconName } from './Icon'
 import { Spinner } from './Button'
 
-export type AlertTone = 'success' | 'error' | 'warning' | 'info'
+type AlertTone = 'success' | 'error' | 'warning' | 'info'
 
 const TONES: Record<AlertTone, { box: string; icon: string }> = {
   success: { box: 'border-success/30 bg-success/10', icon: 'text-success' },
@@ -89,7 +89,7 @@ export function ErrorState({
   )
 }
 
-export function LoadingSkeleton({ className }: { className?: string }) {
+function LoadingSkeleton({ className }: { className?: string }) {
   return <div className={cn('animate-pulse rounded-control bg-line/60', className)} aria-hidden="true" />
 }
 

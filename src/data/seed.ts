@@ -588,7 +588,7 @@ export function refreshDemoDates(db: Database): Database {
   return db
 }
 
-export function isSameDay(a: string, b: string): boolean {
+function isSameDay(a: string, b: string): boolean {
   return toISO(new Date(a)) === toISO(new Date(b))
 }
 

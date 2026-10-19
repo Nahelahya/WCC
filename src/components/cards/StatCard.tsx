@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/session'
 import { Icon, type IconName } from '@/components/ui/Icon'
 
-export type StatTone = 'primary' | 'success' | 'danger' | 'accent' | 'info' | 'neutral' | 'warning'
+type StatTone = 'primary' | 'success' | 'danger' | 'accent' | 'info' | 'neutral' | 'warning'
 
 const ICON_TONES: Record<StatTone, string> = {
   primary: 'bg-primary/10 text-primary',

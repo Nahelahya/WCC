@@ -15,9 +15,9 @@ export function sessionStatus(s: Session, now: Date = new Date()): SessionStatus
 }
 
 /** Jendela check-in: dibuka 30 menit sebelum sesi dan ditutup saat sesi berakhir. */
-export const CHECKIN_OPEN_BEFORE_MIN = 30
+const CHECKIN_OPEN_BEFORE_MIN = 30
 
-export function checkInWindow(s: Session) {
+function checkInWindow(s: Session) {
   const open = minutesOf(s.startTime) - CHECKIN_OPEN_BEFORE_MIN
   const close = minutesOf(s.endTime)
   return { open, close }

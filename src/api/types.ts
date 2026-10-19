@@ -71,7 +71,7 @@ export interface UploadResult {
 /* ------------------------------------------------------------------ */
 
 export type PaymentPurpose = 'pendaftaran' | 'iuran'
-export type PaymentStatus = 'pending' | 'paid' | 'expired' | 'failed'
+type PaymentStatus = 'pending' | 'paid' | 'expired' | 'failed'
 
 export interface PaymentConfig {
   /** True bila kredensial DOKU sudah diisi di server. */

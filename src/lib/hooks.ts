@@ -59,7 +59,7 @@ export function errorMessage(err: unknown): string {
   return 'Terjadi kesalahan. Silakan coba lagi.'
 }
 
-export function sleep(ms: number): Promise<void> {
+function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
 }
 
@@ -213,7 +213,7 @@ export function useIdleLogout(timeoutMs: number, onIdle: () => void) {
 }
 
 /** Menjalankan aksi important sekali saja selama masih berjalan (cegah submit ganda). */
-export function useSubmitting() {
+function useSubmitting() {
   const [submitting, setSubmitting] = useState(false)
   const run = useCallback(async (fn: () => Promise<void>) => {
     setSubmitting((prev) => {

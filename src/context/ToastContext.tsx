@@ -24,14 +24,14 @@ const ICONS: Record<ToastType, string> = {
   warning: '!',
 }
 
-export const TOAST_STYLES: Record<ToastType, string> = {
+const TOAST_STYLES: Record<ToastType, string> = {
   success: 'border-success/30 bg-success/10 text-success',
   error: 'border-danger/30 bg-danger/10 text-danger',
   info: 'border-info/30 bg-info/10 text-info',
   warning: 'border-warning/30 bg-warning/10 text-warning',
 }
 
-export const TOAST_ICON_STYLES: Record<ToastType, string> = TOAST_STYLES
+const TOAST_ICON_STYLES: Record<ToastType, string> = TOAST_STYLES
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])

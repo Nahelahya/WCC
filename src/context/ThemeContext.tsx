@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 export type Theme = 'light' | 'dark'
 
 /** Kunci penyimpanan pilihan tema; dipakai juga oleh skrip anti-kedip di index.html. */
-export const THEME_STORAGE_KEY = 'wcc-theme'
+const THEME_STORAGE_KEY = 'wcc-theme'
 
 interface ThemeContextValue {
   theme: Theme

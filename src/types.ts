@@ -67,7 +67,7 @@ export interface Coach {
 }
 
 export type RegistrationStatus = 'baru' | 'diverifikasi' | 'ditolak'
-export type Gender = 'L' | 'P'
+type Gender = 'L' | 'P'
 
 export interface Registration {
   id: string
@@ -126,7 +126,7 @@ export interface AuditLogEntry {
   detail?: Record<string, unknown> | null
 }
 
-export interface SyncLogEntry {
+interface SyncLogEntry {
   id: string
   at: string
   status: 'success' | 'failed'
