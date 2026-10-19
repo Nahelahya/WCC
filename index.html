@@ -17,9 +17,33 @@
       rel="stylesheet"
     />
     <script>
-      // Terapkan tema sebelum React dimuat agar tidak ada kedipan (flash) saat
-      // halaman pertama dibuka. Pilihan tersimpan di localStorage "wcc-theme".
+      // Hapus service worker lama & cache usang agar bundle terbaru langsung dimuat
+      // (sekali jalan; tidak mengulang).
       (function () {
+        try {
+          if (sessionStorage.getItem('wcc_sw_cleared')) return
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              var had = regs.length > 0
+              regs.forEach(function (r) { r.unregister() })
+              if (caches && caches.keys) {
+                caches.keys().then(function (keys) {
+                  keys.forEach(function (k) { caches.delete(k) })
+                })
+              }
+              if (had) {
+                sessionStorage.setItem('wcc_sw_cleared', '1')
+                window.location.reload()
+              } else {
+                sessionStorage.setItem('wcc_sw_cleared', '1')
+              }
+            }).catch(function () {})
+          } else {
+            sessionStorage.setItem('wcc_sw_cleared', '1')
+          }
+        } catch (e) {}
+      })()
+    </script>
         try {
           var stored = localStorage.getItem('wcc-theme')
           var theme =
