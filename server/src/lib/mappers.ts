@@ -30,6 +30,8 @@ export interface UserRow extends QueryResultRow {
   parent_name: string | null
   parent_phone: string | null
   password_hash?: string
+  /** Token acak untuk QR ID card absensi. */
+  attendance_token?: string | null
 }
 
 export function mapUser(row: UserRow) {
@@ -49,6 +51,7 @@ export function mapUser(row: UserRow) {
     medicalHistory: row.medical_history ?? undefined,
     parentName: row.parent_name ?? undefined,
     parentPhone: row.parent_phone ?? undefined,
+    attendanceToken: row.attendance_token ?? undefined,
   }
 }
 

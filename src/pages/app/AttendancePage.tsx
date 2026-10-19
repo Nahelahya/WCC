@@ -18,11 +18,37 @@ import type { AttendanceRow } from '@/api/client'
 
 const PER_PAGE = 10
 
+import { AttendanceScanPanel } from './AttendanceScanPanel'
+
 export function AttendancePage() {
   const { user } = useAuth()
-  if (user!.role === 'coach') return <CoachAttendanceList />
-  if (user!.role === 'pengurus') return <AttendanceRecap />
-  return <MyAttendance />
+  const [mode, setMode] = useState<'scan' | 'list'>('scan')
+  if (user!.role === 'anggota') return <MyAttendance />
+  return (
+    <>
+      <div className="mb-4 flex gap-2">
+        <button
+          className={`rounded-control px-3 py-1.5 text-sm font-medium ${mode === 'scan' ? 'bg-primary text-white' : 'bg-bg text-ink'}`}
+          onClick={() => setMode('scan')}
+        >
+          Scan QR
+        </button>
+        <button
+          className={`rounded-control px-3 py-1.5 text-sm font-medium ${mode === 'list' ? 'bg-primary text-white' : 'bg-bg text-ink'}`}
+          onClick={() => setMode('list')}
+        >
+          {user!.role === 'coach' ? 'Daftar Hadir' : 'Rekap Absensi'}
+        </button>
+      </div>
+      {mode === 'scan' ? (
+        <AttendanceScanPanel />
+      ) : user!.role === 'coach' ? (
+        <CoachAttendanceList />
+      ) : (
+        <AttendanceRecap />
+      )}
+    </>
+  )
 }
 
 /* ------------------------- Anggota: riwayat saya ------------------------ */

@@ -18,6 +18,8 @@ export interface User {
   medicalHistory?: string
   parentName?: string
   parentPhone?: string
+  /** Token acak untuk QR ID card absensi (hanya terlihat milik sendiri/pengurus). */
+  attendanceToken?: string
 }
 
 export interface Session {

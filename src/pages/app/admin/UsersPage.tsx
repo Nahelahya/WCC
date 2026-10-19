@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button'
 import { Input, Select } from '@/components/ui/Field'
 import { Modal, ConfirmDialog } from '@/components/ui/Modal'
 import { StatusBadge, type StatusTone } from '@/components/ui/StatusBadge'
+import { MemberIdCard } from '@/components/cards/MemberIdCard'
 import { MemberDuesPanel } from '@/components/payments/MemberDuesPanel'
 import { ROLE_LABEL } from '@/components/layout/nav'
 import { formatDateID } from '@/lib/date'
@@ -562,6 +563,13 @@ export function UsersPage() {
 
             {detail.role === 'anggota' && (
               <MemberDuesPanel userId={detail.id} userName={detail.name} />
+            )}
+
+            {detail.role === 'anggota' && (
+              <div className="rounded-control border border-line p-3">
+                <p className="mb-2 text-[12px] font-semibold text-muted">ID Card &amp; QR Code Absensi</p>
+                <MemberIdCard userId={detail.id} name={detail.name} photoUrl={detail.photoUrl} memberNumber={detail.id} />
+              </div>
             )}
 
             {detail.role !== 'anggota' && (

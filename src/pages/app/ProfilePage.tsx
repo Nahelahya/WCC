@@ -11,6 +11,7 @@ import { Input, Select, Textarea } from '@/components/ui/Field'
 import { Alert, EmptyState, ListSkeleton } from '@/components/ui/Feedback'
 import { ConfirmDialog } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
+import { MemberIdCard } from '@/components/cards/MemberIdCard'
 import { Avatar } from '@/components/layout/SidebarNavigation'
 import { StatusBadge, ATTENDANCE_TONE, ATTENDANCE_LABEL } from '@/components/ui/StatusBadge'
 import { ROLE_LABEL } from '@/components/layout/nav'
@@ -224,6 +225,12 @@ export function ProfilePage() {
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* ID Card & QR Code */}
+      <div className="card mb-6 p-5">
+        <h3 className="mb-3 text-sm font-semibold text-ink">ID Card &amp; QR Code Absensi</h3>
+        <MemberIdCard userId={user!.id} name={user!.name} photoUrl={user!.photoUrl} memberNumber={user!.id} />
       </div>
 
       {user!.role === 'anggota' && (

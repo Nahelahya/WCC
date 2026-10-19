@@ -6,6 +6,7 @@ import { wrap } from '../lib/async'
 import { mapUser, type UserRow } from '../lib/mappers'
 import { hashPassword, verifyPassword } from '../lib/password'
 import { newId } from '../lib/ids'
+import { randomUUID } from 'node:crypto'
 import { requireAuth, requireRole } from '../middleware/auth'
 import type { Role } from '../types'
 
@@ -74,8 +75,8 @@ userRouter.post(
       const { rows } = await query<UserRow>(
         `insert into users
            (id, name, email, role, phone, photo_url, membership_status, coach_id,
-            password_hash, joined_at, created_at, updated_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9, current_date, now(), now())
+            password_hash, joined_at, created_at, updated_at, attendance_token)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9, current_date, now(), now(), $10)
          returning *`,
         [
           newId('u'),
@@ -87,6 +88,7 @@ userRouter.post(
           input.membershipStatus ?? 'aktif',
           input.role === 'pengurus' ? null : input.coachId || null,
           await hashPassword(input.password),
+          randomUUID(),
         ],
       )
       res.status(201).json(mapUser(rows[0]))
@@ -227,6 +229,60 @@ userRouter.post(
     // Paksa login ulang di semua perangkat setelah password berubah.
     await query('update refresh_tokens set revoked_at = now() where user_id = $1 and revoked_at is null', [id])
     res.json({ ok: true })
+  }),
+)
+
+/* ------------------------------------------------------------------ */
+/* Token QR absensi (ID card)                                          */
+/* ------------------------------------------------------------------ */
+
+// Petugas mencari anggota berdasarkan token yang dipindai dari QR ID card.
+userRouter.get(
+  '/attendance-token/:token',
+  requireRole('pengurus', 'coach'),
+  wrap(async (req, res) => {
+    const { rows } = await query<UserRow>(
+      'select * from users where attendance_token = $1 limit 1',
+      [req.params.token],
+    )
+    const row = rows[0]
+    if (!row) throw ApiError.notFound('Anggota tidak ditemukan.')
+    res.json(mapUser(row))
+  }),
+)
+
+// Anggota (atau pengurus) melihat token QR-nya sendiri untuk dicetak di ID card.
+userRouter.get(
+  '/:id/attendance-token',
+  wrap(async (req, res) => {
+    const { id } = req.params
+    const isSelf = req.auth!.userId === id
+    const isAdmin = req.auth!.role === 'pengurus'
+    if (!isSelf && !isAdmin) throw ApiError.forbidden()
+    const { rows } = await query<UserRow>('select * from users where id = $1', [id])
+    const row = rows[0]
+    if (!row) throw ApiError.notFound('Pengguna tidak ditemukan.')
+    // Pastikan token ada (backfill bila null).
+    let token = row.attendance_token
+    if (!token) {
+      token = randomUUID()
+      await query('update users set attendance_token = $2, updated_at = now() where id = $1', [id, token])
+    }
+    res.json({ token })
+  }),
+)
+
+// Petugas dapat membuat ulang token QR (mis. kartu hilang) — token lama tidak berlaku lagi.
+userRouter.post(
+  '/:id/attendance-token/regenerate',
+  requireRole('pengurus'),
+  wrap(async (req, res) => {
+    const { id } = req.params
+    const { rows: existing } = await query<UserRow>('select id from users where id = $1', [id])
+    if (!existing[0]) throw ApiError.notFound('Pengguna tidak ditemukan.')
+    const token = randomUUID()
+    await query('update users set attendance_token = $2, updated_at = now() where id = $1', [id, token])
+    res.json({ token })
   }),
 )
 

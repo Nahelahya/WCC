@@ -214,7 +214,8 @@ export const userApi = {
           photoUrl: input.photoUrl,
           joinedAt: todayISO(),
           membershipStatus: input.membershipStatus ?? 'aktif',
-          coachId: input.role === 'pengurus' ? undefined : input.coachId || undefined,
+           coachId: input.role === 'pengurus' ? undefined : input.coachId || undefined,
+           attendanceToken: uid('qr'),
         }
         d.users.push(created)
         return created
@@ -257,6 +258,33 @@ export const userApi = {
     return delay(
       mutate((db) => {
         db.users = db.users.filter((u) => u.id !== userId)
+      }),
+    )
+  },
+  async getAttendanceToken(userId: string): Promise<{ token: string }> {
+    const db = read()
+    const u = db.users.find((x) => x.id === userId)
+    if (!u) return fail('Pengguna tidak ditemukan.', 404)
+    if (!u.attendanceToken) {
+      u.attendanceToken = uid('qr')
+      // persist
+      mutate(() => {})
+    }
+    return delay({ token: u.attendanceToken! })
+  },
+  async resolveAttendanceToken(token: string): Promise<User> {
+    const db = read()
+    const u = db.users.find((x) => x.attendanceToken === token)
+    if (!u) return fail('Anggota tidak ditemukan.', 404)
+    return delay(u)
+  },
+  async regenerateAttendanceToken(userId: string): Promise<{ token: string }> {
+    return delay(
+      mutate((db) => {
+        const u = db.users.find((x) => x.id === userId)
+        if (!u) throw new Error('Pengguna tidak ditemukan.')
+        u.attendanceToken = uid('qr')
+        return { token: u.attendanceToken }
       }),
     )
   },

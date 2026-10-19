@@ -8,6 +8,12 @@ import { ThemeProvider } from './context/ThemeContext'
 import { ScrollToTop } from './pages/NotFoundPage'
 import './index.css'
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => undefined)
+  })
+}
+
 const root = document.getElementById('root')
 if (!root) throw new Error('Elemen #root tidak ditemukan')
 

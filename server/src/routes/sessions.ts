@@ -208,9 +208,9 @@ sessionRouter.post(
 
     const { rows } = await query<AttendanceRowDB>(
       `insert into attendance (id, session_id, user_id, check_in_at, status)
-       values ($1, $2, $3, now(), 'menunggu')
+       values ($1, $2, $3, now(), $4)
        returning *`,
-      [newId('a'), session.id, userId],
+      [newId('a'), session.id, userId, req.auth!.role === 'anggota' ? 'menunggu' : 'hadir'],
     )
     res.status(201).json(mapAttendance(rows[0]))
   }),

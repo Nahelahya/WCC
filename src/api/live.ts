@@ -215,6 +215,15 @@ export const userApi = {
   async remove(userId: string): Promise<void> {
     await request(`/users/${encodeURIComponent(userId)}`, { method: 'DELETE' })
   },
+  async getAttendanceToken(userId: string): Promise<{ token: string }> {
+    return request(`/users/${encodeURIComponent(userId)}/attendance-token`)
+  },
+  async resolveAttendanceToken(token: string): Promise<User> {
+    return request(`/users/attendance-token/${encodeURIComponent(token)}`)
+  },
+  async regenerateAttendanceToken(userId: string): Promise<{ token: string }> {
+    return request(`/users/${encodeURIComponent(userId)}/attendance-token/regenerate`, { method: 'POST' })
+  },
 }
 
 /* ------------------------------------------------------------------ */

@@ -11,7 +11,7 @@
 } from '@/types'
 import { addDays, todayISO, toISO } from '@/lib/date'
 
-export const DB_VERSION = 2
+export const DB_VERSION = 3
 export const DB_KEY = 'wcc.db'
 
 function nowHHMM(offsetMinutes: number): string {
@@ -135,7 +135,10 @@ const additionalMembers: User[] = MEMBER_NAMES.slice(1).map((name, i) => ({
   membershipStatus: 'aktif' as const,
 }))
 
-const allUsers = [...users, ...additionalMembers]
+const allUsers = [...users, ...additionalMembers].map((u) => ({
+  ...u,
+  attendanceToken: u.attendanceToken ?? `qr-${u.id}`,
+}))
 
 function sessions(): Session[] {
   const today = todayISO()
