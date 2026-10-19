@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { BrowserQRCodeReader } from '@zxing/browser'
 import { attendanceApi, sessionApi, userApi } from '@/api/client'
-import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useAsync } from '@/lib/hooks'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -13,7 +12,7 @@ import { CardSkeleton, EmptyState, ErrorState } from '@/components/ui/Feedback'
 import { formatDateID } from '@/lib/date'
 import { sessionStatus, canCheckIn } from '@/lib/session'
 import { enqueueAttendance, getPending, markSynced, pendingCount } from '@/lib/offlineQueue'
-import type { Session, User } from '@/types'
+import type { User } from '@/types'
 
 type ScanResult = {
   kind: 'success' | 'already' | 'not_found' | 'session_inactive' | 'error'
@@ -23,7 +22,6 @@ type ScanResult = {
 }
 
 export function AttendanceScanPanel() {
-  const { user } = useAuth()
   const { toast } = useToast()
   const sessions = useAsync(() => sessionApi.list(), [])
   const members = useAsync(() => userApi.list(), [])

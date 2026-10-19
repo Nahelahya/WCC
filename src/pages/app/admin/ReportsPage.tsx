@@ -9,7 +9,7 @@ import { ErrorState } from '@/components/ui/Feedback'
 import { Button } from '@/components/ui/Button'
 import { Input, Select } from '@/components/ui/Field'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { downloadTextFile, formatDateID, formatRupiah, monthLabelID, todayISO } from '@/lib/date'
+import { downloadTextFile, formatDateID, formatRupiah, todayISO } from '@/lib/date'
 import type { Transaction } from '@/types'
 
 function isoFrom(d: Date) {

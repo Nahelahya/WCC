@@ -29,7 +29,6 @@ import type {
   UpdateUserAccountInput,
   UploadResult,
 } from './types'
-import type { LandingContent } from '@/types.landing'
 
 /**
  * Klien API asli. Memanggil backend Express + PostgreSQL yang ada di folder
