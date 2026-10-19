@@ -35,5 +35,5 @@ export const statsApi = impl.statsApi
 // Password akun demo yang dipakai halaman masuk (sama untuk mock & API).
 const DEMO_PASSWORD = impl.DEMO_PASSWORD
 
-export type { AttendanceRow, AuthSession, SessionInput, TreasurySummary, UploadResult } from './types'
-export type { Payment, PaymentPurpose, PaymentConfig } from './types'
+export type { AttendanceRow, SessionInput, TreasurySummary } from './types'
+export type { Payment, PaymentPurpose } from './types'
