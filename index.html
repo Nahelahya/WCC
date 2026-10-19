@@ -42,6 +42,10 @@
         } catch (e) {}
       })()
     </script>
+    <script>
+      // Terapkan tema sebelum React dimuat agar tidak ada kedipan (flash) saat
+      // halaman pertama dibuka. Pilihan tersimpan di localStorage "wcc-theme".
+      (function () {
         try {
           var stored = localStorage.getItem('wcc-theme')
           var theme =
