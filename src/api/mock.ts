@@ -277,17 +277,7 @@ export const userApi = {
     const u = db.users.find((x) => x.attendanceToken === token)
     if (!u) return fail('Anggota tidak ditemukan.', 404)
     return delay(u)
-  },
-  async regenerateAttendanceToken(userId: string): Promise<{ token: string }> {
-    return delay(
-      mutate((db) => {
-        const u = db.users.find((x) => x.id === userId)
-        if (!u) throw new Error('Pengguna tidak ditemukan.')
-        u.attendanceToken = uid('qr')
-        return { token: u.attendanceToken }
-      }),
-    )
-  },
+}
 }
 
 /* ------------------------------------------------------------------ */

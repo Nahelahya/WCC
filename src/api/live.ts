@@ -221,9 +221,6 @@ export const userApi = {
   async resolveAttendanceToken(token: string): Promise<User> {
     return request(`/users/attendance-token/${encodeURIComponent(token)}`)
   },
-  async regenerateAttendanceToken(userId: string): Promise<{ token: string }> {
-    return request(`/users/${encodeURIComponent(userId)}/attendance-token/regenerate`, { method: 'POST' })
-  },
 }
 
 /* ------------------------------------------------------------------ */

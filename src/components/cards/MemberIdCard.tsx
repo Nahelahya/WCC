@@ -102,25 +102,8 @@ export function MemberIdCard({ userId, name, photoUrl, memberNumber }: Props) {
         <Button size="sm" variant="secondary" icon="download" onClick={printCard} disabled={!qrUrl}>
           Cetak ID Card
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          icon="refresh"
-          onClick={async () => {
-            try {
-              const res = await userApi.regenerateAttendanceToken(userId)
-              setToken(res.token)
-              const url = await QRCode.toDataURL(res.token, { width: 240, margin: 1, errorCorrectionLevel: 'M' })
-              setQrUrl(url)
-              toast('QR Code diperbarui.', 'success')
-            } catch {
-              toast('Gagal memperbarui QR Code.', 'error')
-            }
-          }}
-        >
-          Buat ulang
-        </Button>
       </div>
+      <p className="text-[11px] text-muted">QR Code bersifat permanen dan tidak dapat dibuat ulang.</p>
       {token && <p className="text-[11px] text-muted">Token: {token.slice(0, 8)}…</p>}
     </div>
   )

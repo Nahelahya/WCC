@@ -272,20 +272,6 @@ userRouter.get(
   }),
 )
 
-// Petugas dapat membuat ulang token QR (mis. kartu hilang) — token lama tidak berlaku lagi.
-userRouter.post(
-  '/:id/attendance-token/regenerate',
-  requireRole('pengurus'),
-  wrap(async (req, res) => {
-    const { id } = req.params
-    const { rows: existing } = await query<UserRow>('select id from users where id = $1', [id])
-    if (!existing[0]) throw ApiError.notFound('Pengguna tidak ditemukan.')
-    const token = randomUUID()
-    await query('update users set attendance_token = $2, updated_at = now() where id = $1', [id, token])
-    res.json({ token })
-  }),
-)
-
 /* ------------------------------------------------------------------ */
 /* Hapus pengguna                                                      */
 /* ------------------------------------------------------------------ */
