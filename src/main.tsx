@@ -19,7 +19,7 @@ if (!root) throw new Error('Elemen #root tidak ditemukan')
 
 createRoot(root).render(
   <StrictMode>
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter>
       <ScrollToTop />
       <ThemeProvider>
         <AuthProvider>
