@@ -63,8 +63,13 @@ export function AttendanceScanPanel() {
   useEffect(() => {
     if (!sessionId && sessions.data && sessions.data.length) {
       const today = new Date().toISOString().slice(0, 10)
-      const todaySession = sessions.data.find((s) => s.date === today)
-      setSessionId((todaySession ?? sessions.data[0]).id)
+      const upcoming = sessions.data.filter((s) => {
+        const st = sessionStatus(s)
+        return st === 'akan-datang' || st === 'berlangsung'
+      })
+      const todaySession = upcoming.find((s) => s.date === today)
+      const pick = todaySession ?? upcoming[0] ?? sessions.data[0]
+      setSessionId(pick.id)
     }
   }, [sessions.data, sessionId])
 
@@ -231,7 +236,12 @@ export function AttendanceScanPanel() {
       <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <Select label="Sesi latihan" value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
           <option value="">Pilih sesi...</option>
-          {(sessions.data ?? []).map((s) => (
+          {(sessions.data ?? [])
+            .filter((s) => {
+              const st = sessionStatus(s)
+              return st === 'akan-datang' || st === 'berlangsung'
+            })
+            .map((s) => (
             <option key={s.id} value={s.id}>
               {formatDateID(s.date)} — {s.title} ({s.startTime}-{s.endTime})
             </option>
@@ -250,8 +260,11 @@ export function AttendanceScanPanel() {
         <CardSkeleton lines={3} />
       ) : sessions.error ? (
         <div className="card"><ErrorState message={sessions.error} onRetry={sessions.reload} /></div>
-      ) : (sessions.data ?? []).length === 0 ? (
-        <div className="card"><EmptyState icon="calendar" title="Belum ada sesi latihan." /></div>
+      ) : (sessions.data ?? []).filter((s) => {
+          const st = sessionStatus(s)
+          return st === 'akan-datang' || st === 'berlangsung'
+        }).length === 0 ? (
+        <div className="card"><EmptyState icon="calendar" title="Tidak ada sesi latihan yang akan datang." /></div>
       ) : (
         <>
           <div className="card mb-4 overflow-hidden">
