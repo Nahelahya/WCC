@@ -105,6 +105,20 @@ export async function runSync(trigger: 'manual' | 'scheduled'): Promise<SyncRunR
 
   try {
     const cfg = getSheetsConfig()
+    // Rekonsiliasi otomatis: pastikan setiap pembayaran iuran 'paid' memiliki
+    // baris transaksi kas (idempoten). Menangani kasus webhook tidak terpicu.
+    await query(`
+      insert into transactions (id, date, type, category, amount, note, recorded_by, payment_id, created_at)
+      select 't-' || substr(md5(p.id),1,8),
+             (p.paid_at at time zone 'Asia/Jakarta')::date,
+             'pemasukan', 'Iuran Anggota', p.amount,
+             trim('Iuran ' || coalesce(p.period,'') || ' — ' || coalesce(p.payer_name,'anggota') || ' (online)'),
+             'Pembayaran Online', p.id, now()
+      from payments p
+      where p.purpose = 'iuran' and p.status = 'paid'
+        and not exists (select 1 from transactions t where t.payment_id = p.id)
+        and not exists (select 1 from transactions t where t.category='Iuran Anggota' and t.amount=p.amount and t.note = trim('Iuran ' || coalesce(p.period,'') || ' — ' || coalesce(p.payer_name,'anggota') || ' (online)'))
+    `)
     const { rows } = await query<TransactionRow>('select * from transactions order by date asc, created_at asc')
 
     const income = rows
