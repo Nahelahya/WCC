@@ -761,10 +761,6 @@ export function RegisterStatusPage() {
           </div>
         )}
       </div>
-
-      <p className="mt-5 text-[12.5px] text-muted">
-        Catatan internal pengurus tidak ditampilkan pada halaman ini.
-      </p>
     </div>
   )
 }
