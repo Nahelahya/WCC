@@ -156,6 +156,37 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* Harga */}
+      <section id="harga" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-14 sm:px-6 sm:py-16">
+        <div className="text-center">
+          <StatusBadge tone="accent" icon="wallet">Harga</StatusBadge>
+          <h2 className="mt-4 text-[26px] font-bold leading-tight text-ink sm:text-[30px]">Paket &amp; Biaya</h2>
+          <p className="mt-3 text-[15px] leading-relaxed text-muted">
+            Pilih paket yang sesuai untuk Anda. Semua harga dalam Rupiah.
+          </p>
+        </div>
+        <div className="mt-8 grid gap-4 sm:grid-cols-3">
+          <div className="card p-6 text-center">
+            <h3 className="text-[17px] font-semibold text-ink">Trial</h3>
+            <p className="mt-2 text-[28px] font-bold text-primary">Rp10.000</p>
+            <p className="mt-1 text-[13px] text-muted">per sesi latihan</p>
+            <p className="mt-3 text-[13px] text-muted">Coba latihan tanpa komitmen.</p>
+          </div>
+          <div className="card p-6 text-center">
+            <h3 className="text-[17px] font-semibold text-ink">Anggota</h3>
+            <p className="mt-2 text-[28px] font-bold text-primary">Rp50.000</p>
+            <p className="mt-1 text-[13px] text-muted">biaya pendaftaran (sekali bayar)</p>
+            <p className="mt-3 text-[13px] text-muted">Akses penuh ke latihan &amp; fasilitas klub.</p>
+          </div>
+          <div className="card p-6 text-center">
+            <h3 className="text-[17px] font-semibold text-ink">Iuran Kas</h3>
+            <p className="mt-2 text-[28px] font-bold text-primary">Rp60.000</p>
+            <p className="mt-1 text-[13px] text-muted">per bulan (boleh dicicil)</p>
+            <p className="mt-3 text-[13px] text-muted">Iuran kas bulanan anggota.</p>
+          </div>
+        </div>
+      </section>
+
       {/* Jadwal */}
       <section id="jadwal" className="scroll-mt-20 border-y border-line bg-surface/70 py-14 sm:py-16">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">

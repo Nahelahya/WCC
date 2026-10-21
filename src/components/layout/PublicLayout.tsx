@@ -14,6 +14,7 @@ import type { LandingContent } from '@/types.landing'
 
 const PUBLIC_LINKS = [
   { to: '/', label: 'Tentang', hash: '#tentang' },
+  { to: '/', label: 'Harga', hash: '#harga' },
   { to: '/', label: 'Jadwal', hash: '#jadwal' },
   { to: '/coach', label: 'Coach', hash: '' },
   { to: '/cara-bergabung', label: 'Cara Bergabung', hash: '' },
