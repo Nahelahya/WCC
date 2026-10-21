@@ -119,6 +119,22 @@ export async function runSync(trigger: 'manual' | 'scheduled'): Promise<SyncRunR
         and not exists (select 1 from transactions t where t.payment_id = p.id)
         and not exists (select 1 from transactions t where t.category='Iuran Anggota' and t.amount=p.amount and t.note = trim('Iuran ' || coalesce(p.period,'') || ' — ' || coalesce(p.payer_name,'anggota') || ' (online)'))
     `)
+    // Rekonsiliasi biaya pendaftaran yang lunas via gateway.
+    await query(`
+      insert into transactions (id, date, type, category, amount, note, recorded_by, created_at)
+      select 't-' || substr(md5(p.id),1,8),
+             (p.paid_at at time zone 'Asia/Jakarta')::date,
+             'pemasukan', 'Biaya Pendaftaran', p.amount,
+             trim('Biaya pendaftaran — ' || coalesce(p.payer_name,'calon anggota') || ' (online)'),
+             'Pembayaran Online', now()
+      from payments p
+      where p.purpose = 'pendaftaran' and p.status = 'paid'
+        and not exists (
+          select 1 from transactions t
+          where t.category = 'Biaya Pendaftaran' and t.amount = p.amount
+            and t.note = trim('Biaya pendaftaran — ' || coalesce(p.payer_name,'calon anggota') || ' (online)')
+        )
+    `)
     const { rows } = await query<TransactionRow>('select * from transactions order by date asc, created_at asc')
 
     const income = rows

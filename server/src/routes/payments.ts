@@ -427,6 +427,13 @@ async function applyPaid(paymentId: string, payload: DokuNotificationBody): Prom
       await client.query(`update registrations set payment_status = 'lunas' where id = $1`, [
         p.registration_id,
       ])
+      // Catat biaya pendaftaran ke kas & treasury.
+      const note = `Biaya pendaftaran — ${p.payer_name || 'calon anggota'} (online)`.trim()
+      await client.query(
+        `insert into transactions (id, date, type, category, amount, note, recorded_by, created_at)
+         values ($1, $2, 'pemasukan', 'Biaya Pendaftaran', $3, $4, $5, now())`,
+        [newId('t'), todayISO(), p.amount, note, 'Pembayaran Online'],
+      )
     }
 
     if (p.purpose === 'iuran' && p.user_id) {
@@ -461,10 +468,9 @@ async function applyPaid(paymentId: string, payload: DokuNotificationBody): Prom
  * Rekonsiliasi: pastikan setiap pembayaran iuran yang 'paid' memiliki baris
  * transaksi kas yang sesuai. Idempoten - aman dipanggil berulang.
  */
-async function reconcilePaidIuranTransactions(): Promise<number> {
+async function reconcilePaidPayments(): Promise<number> {
   const { rows: paid } = await query<PaymentRow>(
-    `select ${PAYMENT_COLUMNS} from payments
-      where purpose = 'iuran' and status = 'paid'`,
+    `select ${PAYMENT_COLUMNS} from payments where status = 'paid'`,
   )
   let created = 0
   for (const p of paid) {
@@ -473,25 +479,44 @@ async function reconcilePaidIuranTransactions(): Promise<number> {
       [p.id],
     )
     if (existing[0]) continue
-    const note = `Iuran ${p.period ?? ''} — ${p.payer_name || 'anggota'} (online)`.trim()
-    const { rows: byNote } = await query<{ id: string }>(
-      `select id from transactions where category = 'Iuran Anggota' and amount = $1 and note = $2 limit 1`,
-      [p.amount, note],
-    )
-    if (byNote[0]) {
-      await query(`update transactions set payment_id = $1 where id = $2`, [p.id, byNote[0].id])
-      created++
-      continue
-    }
     const dateStr = p.paid_at
       ? (p.paid_at instanceof Date ? p.paid_at : new Date(p.paid_at)).toISOString().slice(0, 10)
       : todayISO()
-    await query(
-      `insert into transactions (id, date, type, category, amount, note, recorded_by, payment_id, created_at)
-       values ($1, $2, 'pemasukan', 'Iuran Anggota', $3, $4, $5, $6, now())`,
-      [newId('t'), dateStr, p.amount, note, 'Pembayaran Online', p.id],
-    )
-    created++
+
+    if (p.purpose === 'iuran') {
+      const note = `Iuran ${p.period ?? ''} — ${p.payer_name || 'anggota'} (online)`.trim()
+      const { rows: byNote } = await query<{ id: string }>(
+        `select id from transactions where category = 'Iuran Anggota' and amount = $1 and note = $2 limit 1`,
+        [p.amount, note],
+      )
+      if (byNote[0]) {
+        await query(`update transactions set payment_id = $1 where id = $2`, [p.id, byNote[0].id])
+        created++
+        continue
+      }
+      await query(
+        `insert into transactions (id, date, type, category, amount, note, recorded_by, payment_id, created_at)
+         values ($1, $2, 'pemasukan', 'Iuran Anggota', $3, $4, $5, $6, now())`,
+        [newId('t'), dateStr, p.amount, note, 'Pembayaran Online', p.id],
+      )
+      created++
+    } else if (p.purpose === 'pendaftaran') {
+      const note = `Biaya pendaftaran — ${p.payer_name || 'calon anggota'} (online)`.trim()
+      const { rows: byNote } = await query<{ id: string }>(
+        `select id from transactions where category = 'Biaya Pendaftaran' and amount = $1 and note = $2 limit 1`,
+        [p.amount, note],
+      )
+      if (byNote[0]) {
+        created++
+        continue
+      }
+      await query(
+        `insert into transactions (id, date, type, category, amount, note, recorded_by, created_at)
+         values ($1, $2, 'pemasukan', 'Biaya Pendaftaran', $3, $4, $5, now())`,
+        [newId('t'), dateStr, p.amount, note, 'Pembayaran Online'],
+      )
+      created++
+    }
   }
   return created
 }
@@ -502,7 +527,7 @@ paymentRouter.post(
   requireAuth,
   requireRole('pengurus'),
   wrap(async (_req, res) => {
-    const created = await reconcilePaidIuranTransactions()
+    const created = await reconcilePaidPayments()
     res.json({ ok: true, created })
   }),
 )
