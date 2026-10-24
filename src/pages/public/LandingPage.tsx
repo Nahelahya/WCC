@@ -150,8 +150,9 @@ export function LandingPage() {
             {about.stats.map((s, i) => {
               let value = s.value
               if (liveStats.data) {
-                if (/anggota/i.test(s.label)) value = liveStats.data.activeMembers.toLocaleString('id-ID') + '+'
+                if (/anggota/i.test(s.label)) value = liveStats.data.activeMembers.toLocaleString('id-ID') + (liveStats.data.activeMembers > 0 ? '+' : '')
                 else if (/coach/i.test(s.label)) value = liveStats.data.coachCount.toLocaleString('id-ID')
+                else if (/sesi/i.test(s.label)) value = liveStats.data.sessionCount.toLocaleString('id-ID') + '+'
               }
               return (
               <div key={s.label} className="card p-4">

@@ -973,11 +973,14 @@ export const landingApi = {
   async get(): Promise<any> {
     return delay({ ...read().landing, updatedAt: new Date().toISOString(), updatedByName: 'Pengurus Demo' })
   },
-  async stats(): Promise<{ activeMembers: number; coachCount: number }> {
+  async stats(): Promise<{ activeMembers: number; coachCount: number; sessionCount: number }> {
     const db = read()
     const activeMembers = db.users.filter((u) => u.role === 'anggota' && u.membershipStatus === 'aktif').length
-    const coachCount = db.users.filter((u) => u.role === 'coach').length
-    return delay({ activeMembers, coachCount })
+    const coachCount = db.coaches.length
+    const now = new Date()
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const sessionCount = db.sessions.filter((s) => s.date.startsWith(ym)).length
+    return delay({ activeMembers, coachCount, sessionCount })
   },
   async update(data: any): Promise<any> {
     return delay(

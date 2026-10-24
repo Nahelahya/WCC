@@ -16,9 +16,12 @@ landingRouter.get(
       "select count(*)::int as total from users where role = 'anggota' and membership_status = 'aktif'",
     )
     const { rows: c } = await query<{ total: number }>(
-      "select count(*)::int as total from users where role = 'coach'",
+      "select count(*)::int as total from coaches",
     )
-    res.json({ activeMembers: m[0]?.total ?? 0, coachCount: c[0]?.total ?? 0 })
+    const { rows: s } = await query<{ total: number }>(
+      "select count(*)::int as total from sessions where date >= date_trunc('month', current_date) and date < date_trunc('month', current_date) + interval '1 month'",
+    )
+    res.json({ activeMembers: m[0]?.total ?? 0, coachCount: c[0]?.total ?? 0, sessionCount: s[0]?.total ?? 0 })
   }),
 )
 

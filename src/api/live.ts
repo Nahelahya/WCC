@@ -544,7 +544,7 @@ export const landingApi = {
   async get(): Promise<any> {
     return request('/landing')
   },
-  async stats(): Promise<{ activeMembers: number; coachCount: number }> {
+  async stats(): Promise<{ activeMembers: number; coachCount: number; sessionCount: number }> {
     return request('/landing/stats')
   },
   async update(data: any): Promise<any> {
