@@ -981,5 +981,12 @@ export const landingApi = {
       }),
     )
   },
+  async stats(): Promise<{ members: number; coaches: number }> {
+    const db = read()
+    return delay({
+      members: (db.users ?? []).filter((u: any) => u.role === 'anggota' && (u.membershipStatus ?? 'aktif') === 'aktif').length,
+      coaches: (db.coaches ?? []).length,
+    })
+  },
 }
 

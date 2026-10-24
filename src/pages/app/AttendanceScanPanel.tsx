@@ -168,7 +168,7 @@ export function AttendanceScanPanel() {
     try {
       const reader = new BrowserQRCodeReader()
       const controls = await reader.decodeFromConstraints(
-        { video: { facingMode: 'environment' } },
+        { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } },
         videoRef.current,
         (result) => {
           if (result) {
@@ -177,6 +177,18 @@ export function AttendanceScanPanel() {
         },
       )
       controlsRef.current = controls
+      // Auto-zoom: aktifkan zoom kamera bila didukung perangkat.
+      try {
+        const stream = videoRef.current.srcObject as MediaStream | null
+        const track = stream?.getVideoTracks?.()[0]
+        const caps = (track as any)?.getCapabilities?.()
+        if (caps && typeof caps.zoom === 'object' && caps.zoom?.max) {
+          const zoom = Math.min(caps.zoom.max, Math.max(caps.zoom.min ?? 1, 2))
+          await (track as any).applyConstraints({ advanced: [{ zoom }] }).catch(() => undefined)
+        }
+      } catch {
+        /* perangkat tidak mendukung zoom */
+      }
       setScanning(true)
     } catch (err: any) {
       setCameraError(err?.message ?? 'Kamera tidak dapat diakses.')

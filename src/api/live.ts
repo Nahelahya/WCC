@@ -550,5 +550,8 @@ export const landingApi = {
       body: JSON.stringify(data),
     })
   },
+  async stats(): Promise<{ members: number; coaches: number }> {
+    return request('/landing/stats')
+  },
 }
 

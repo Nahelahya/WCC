@@ -165,6 +165,19 @@ landingRouter.get(
   }),
 )
 
+landingRouter.get(
+  '/stats',
+  wrap(async (_req, res) => {
+    const { rows: m } = await query<{ total: number }>(
+      "select count(*)::int as total from users where role = 'anggota' and membership_status = 'aktif'",
+    )
+    const { rows: c } = await query<{ total: number }>(
+      'select count(*)::int as total from coaches',
+    )
+    res.json({ members: m[0]?.total ?? 0, coaches: c[0]?.total ?? 0 })
+  }),
+)
+
 landingRouter.put(
   '/',
   requireAuth,
