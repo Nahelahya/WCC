@@ -86,6 +86,9 @@ export function LandingPage() {
               {hero.title}
             </h1>
             <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-white/80 sm:text-base">{hero.subtitle}</p>
+            <p className="mt-3 text-[13px] text-white/70">
+              {liveStats.loading ? '…' : `${(liveStats.data?.activeMembers ?? 0).toLocaleString('id-ID')} anggota aktif · ${(liveStats.data?.coachCount ?? 0).toLocaleString('id-ID')} coach`}
+            </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <ContentLink href={hero.ctaPrimaryHref} className={buttonClasses('accent', 'lg')}>
                 <Icon name="plus" size={18} />
@@ -144,33 +147,22 @@ export function LandingPage() {
             <p className="mt-3 text-[15px] leading-relaxed text-muted">{about.description}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            {about.stats.map((s, i) => (
+            {about.stats.map((s, i) => {
+              let value = s.value
+              if (liveStats.data) {
+                if (/anggota/i.test(s.label)) value = liveStats.data.activeMembers.toLocaleString('id-ID') + '+'
+                else if (/coach/i.test(s.label)) value = liveStats.data.coachCount.toLocaleString('id-ID')
+              }
+              return (
               <div key={s.label} className="card p-4">
                 <span className="flex h-10 w-10 items-center justify-center rounded-control bg-primary/10 text-primary">
                   <Icon name={i % 2 === 0 ? 'check-circle' : 'users'} size={20} />
                 </span>
-                <h3 className="mt-3 text-[15.5px] font-semibold text-ink">{s.value}</h3>
+                <h3 className="mt-3 text-[15.5px] font-semibold text-ink">{value}</h3>
                 <p className="mt-1 text-[13.5px] text-muted">{s.label}</p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Statistik anggota (real-time) */}
-      <section className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-10 sm:px-6 sm:py-12">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="card p-5 text-center">
-            <p className="text-[32px] font-bold text-primary">
-              {liveStats.loading ? '…' : (liveStats.data?.activeMembers ?? 0).toLocaleString('id-ID')}
-            </p>
-            <p className="mt-1 text-[14px] text-muted">Anggota Aktif</p>
-          </div>
-          <div className="card p-5 text-center">
-            <p className="text-[32px] font-bold text-primary">
-              {liveStats.loading ? '…' : (liveStats.data?.coachCount ?? 0).toLocaleString('id-ID')}
-            </p>
-            <p className="mt-1 text-[14px] text-muted">Coach</p>
+              )
+            })}
           </div>
         </div>
       </section>
