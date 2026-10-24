@@ -63,14 +63,16 @@ export function LandingPage() {
 
   const hero = content.hero
   const about = content.about
-  // Statistik operasional selalu dihitung real-time dari database, lalu
-  // digabung dengan stat lain dari pengaturan landing (mis. Tahun Berdiri).
+  // Anggota & coach selalu real-time dari database. "Sesi Latihan/Bulan" tetap
+  // bisa diatur pengurus lewat pengaturan landing (default 16x/bulan).
   const live = liveStats.data
+  const sesiStats = about.stats.filter((s) => /sesi/i.test(s.label))
+  const otherStats = about.stats.filter((s) => !/anggota|sesi|coach/i.test(s.label))
   const stats = [
     { label: 'Anggota Aktif', value: live ? live.activeMembers.toLocaleString('id-ID') : '…' },
-    { label: 'Sesi Latihan/Bulan', value: live ? live.sessionCount.toLocaleString('id-ID') : '…' },
+    ...(sesiStats.length > 0 ? sesiStats : [{ label: 'Sesi Latihan/Bulan', value: '16' }]),
     { label: 'Coach Bersertifikasi', value: live ? live.coachCount.toLocaleString('id-ID') : '…' },
-    ...about.stats.filter((s) => !/anggota|sesi|coach/i.test(s.label)),
+    ...otherStats,
   ]
 
   return (
