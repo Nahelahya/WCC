@@ -63,6 +63,14 @@ export function LandingPage() {
 
   const hero = content.hero
   const about = content.about
+  // Nilai statistik real-time: anggota, coach, dan sesi bulan ini.
+  const statValue = (s: { label: string; value: string }) => {
+    if (!liveStats.data) return s.value
+    if (/anggota/i.test(s.label)) return liveStats.data.activeMembers.toLocaleString('id-ID')
+    if (/coach/i.test(s.label)) return liveStats.data.coachCount.toLocaleString('id-ID')
+    if (/sesi/i.test(s.label)) return liveStats.data.sessionCount.toLocaleString('id-ID')
+    return s.value
+  }
 
   return (
     <>
@@ -86,9 +94,6 @@ export function LandingPage() {
               {hero.title}
             </h1>
             <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-white/80 sm:text-base">{hero.subtitle}</p>
-            <p className="mt-3 text-[13px] text-white/70">
-              {liveStats.loading ? '…' : `${(liveStats.data?.activeMembers ?? 0).toLocaleString('id-ID')} anggota aktif · ${(liveStats.data?.coachCount ?? 0).toLocaleString('id-ID')} coach`}
-            </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <ContentLink href={hero.ctaPrimaryHref} className={buttonClasses('accent', 'lg')}>
                 <Icon name="plus" size={18} />
@@ -106,7 +111,7 @@ export function LandingPage() {
               <dl className="mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-white/20 pt-6">
                 {about.stats.map((s) => (
                   <div key={s.label}>
-                    <dt className="text-2xl font-bold text-accent">{s.value}</dt>
+                    <dt className="text-2xl font-bold text-accent">{statValue(s)}</dt>
                     <dd className="mt-0.5 text-[12.5px] text-white/70">{s.label}</dd>
                   </div>
                 ))}
@@ -147,23 +152,15 @@ export function LandingPage() {
             <p className="mt-3 text-[15px] leading-relaxed text-muted">{about.description}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            {about.stats.map((s, i) => {
-              let value = s.value
-              if (liveStats.data) {
-                if (/anggota/i.test(s.label)) value = liveStats.data.activeMembers.toLocaleString('id-ID') + (liveStats.data.activeMembers > 0 ? '+' : '')
-                else if (/coach/i.test(s.label)) value = liveStats.data.coachCount.toLocaleString('id-ID')
-                else if (/sesi/i.test(s.label)) value = liveStats.data.sessionCount.toLocaleString('id-ID') + '+'
-              }
-              return (
+            {about.stats.map((s, i) => (
               <div key={s.label} className="card p-4">
                 <span className="flex h-10 w-10 items-center justify-center rounded-control bg-primary/10 text-primary">
                   <Icon name={i % 2 === 0 ? 'check-circle' : 'users'} size={20} />
                 </span>
-                <h3 className="mt-3 text-[15.5px] font-semibold text-ink">{value}</h3>
+                <h3 className="mt-3 text-[15.5px] font-semibold text-ink">{statValue(s)}</h3>
                 <p className="mt-1 text-[13.5px] text-muted">{s.label}</p>
               </div>
-              )
-            })}
+            ))}
           </div>
         </div>
       </section>
