@@ -21,7 +21,7 @@ const submitSchema = z.object({
   email: z.string().trim().email('Format email tidak valid.'),
   phone: z.string().trim().min(1, 'Nomor kontak wajib diisi.'),
   gender: z.enum(['L', 'P'], {
-    errorMap: () => ({ message: 'Jenis kelamin wajib dipilih (L/P).' }),
+    message: 'Jenis kelamin wajib dipilih (L/P).',
   }),
   nik: z
     .string()
