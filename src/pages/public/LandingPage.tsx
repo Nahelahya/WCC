@@ -63,6 +63,16 @@ export function LandingPage() {
 
   const hero = content.hero
   const about = content.about
+  // Bila pengurus mengosongkan statistik di pengaturan landing, tetap tampilkan
+  // statistik yang bisa dihitung real-time dari database.
+  const stats =
+    about.stats.length > 0
+      ? about.stats
+      : [
+          { label: 'Anggota Aktif', value: '0' },
+          { label: 'Sesi Latihan/Bulan', value: '0' },
+          { label: 'Coach Bersertifikasi', value: '0' },
+        ]
   // Nilai statistik real-time: anggota, coach, dan sesi bulan ini.
   const statValue = (s: { label: string; value: string }) => {
     if (!liveStats.data) return s.value
@@ -107,9 +117,9 @@ export function LandingPage() {
               </ContentLink>
             </div>
 
-            {about.stats.length > 0 && (
+            {stats.length > 0 && (
               <dl className="mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-white/20 pt-6">
-                {about.stats.map((s) => (
+                {stats.map((s) => (
                   <div key={s.label}>
                     <dt className="text-2xl font-bold text-accent">{statValue(s)}</dt>
                     <dd className="mt-0.5 text-[12.5px] text-white/70">{s.label}</dd>
@@ -152,7 +162,7 @@ export function LandingPage() {
             <p className="mt-3 text-[15px] leading-relaxed text-muted">{about.description}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            {about.stats.map((s, i) => (
+            {stats.map((s, i) => (
               <div key={s.label} className="card p-4">
                 <span className="flex h-10 w-10 items-center justify-center rounded-control bg-primary/10 text-primary">
                   <Icon name={i % 2 === 0 ? 'check-circle' : 'users'} size={20} />
