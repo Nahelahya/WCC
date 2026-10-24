@@ -63,24 +63,15 @@ export function LandingPage() {
 
   const hero = content.hero
   const about = content.about
-  // Bila pengurus mengosongkan statistik di pengaturan landing, tetap tampilkan
-  // statistik yang bisa dihitung real-time dari database.
-  const stats =
-    about.stats.length > 0
-      ? about.stats
-      : [
-          { label: 'Anggota Aktif', value: '0' },
-          { label: 'Sesi Latihan/Bulan', value: '0' },
-          { label: 'Coach Bersertifikasi', value: '0' },
-        ]
-  // Nilai statistik real-time: anggota, coach, dan sesi bulan ini.
-  const statValue = (s: { label: string; value: string }) => {
-    if (!liveStats.data) return s.value
-    if (/anggota/i.test(s.label)) return liveStats.data.activeMembers.toLocaleString('id-ID')
-    if (/coach/i.test(s.label)) return liveStats.data.coachCount.toLocaleString('id-ID')
-    if (/sesi/i.test(s.label)) return liveStats.data.sessionCount.toLocaleString('id-ID')
-    return s.value
-  }
+  // Statistik operasional selalu dihitung real-time dari database, lalu
+  // digabung dengan stat lain dari pengaturan landing (mis. Tahun Berdiri).
+  const live = liveStats.data
+  const stats = [
+    { label: 'Anggota Aktif', value: live ? live.activeMembers.toLocaleString('id-ID') : '…' },
+    { label: 'Sesi Latihan/Bulan', value: live ? live.sessionCount.toLocaleString('id-ID') : '…' },
+    { label: 'Coach Bersertifikasi', value: live ? live.coachCount.toLocaleString('id-ID') : '…' },
+    ...about.stats.filter((s) => !/anggota|sesi|coach/i.test(s.label)),
+  ]
 
   return (
     <>
@@ -121,7 +112,7 @@ export function LandingPage() {
               <dl className="mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-white/20 pt-6">
                 {stats.map((s) => (
                   <div key={s.label}>
-                    <dt className="text-2xl font-bold text-accent">{statValue(s)}</dt>
+                    <dt className="text-2xl font-bold text-accent">{s.value}</dt>
                     <dd className="mt-0.5 text-[12.5px] text-white/70">{s.label}</dd>
                   </div>
                 ))}
@@ -167,7 +158,7 @@ export function LandingPage() {
                 <span className="flex h-10 w-10 items-center justify-center rounded-control bg-primary/10 text-primary">
                   <Icon name={i % 2 === 0 ? 'check-circle' : 'users'} size={20} />
                 </span>
-                <h3 className="mt-3 text-[15.5px] font-semibold text-ink">{statValue(s)}</h3>
+                <h3 className="mt-3 text-[15.5px] font-semibold text-ink">{s.value}</h3>
                 <p className="mt-1 text-[13.5px] text-muted">{s.label}</p>
               </div>
             ))}
