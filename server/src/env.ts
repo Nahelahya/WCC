@@ -70,11 +70,11 @@ export const env = {
   uploadMaxMb: Number(process.env.UPLOAD_MAX_MB ?? 5),
 
   // ---- Pembatasan laju permintaan (rate limit) ----
-  // 0 = NONAKTIF: tanpa blokir sementara (tidak ada pesan "Terlalu banyak
-  // permintaan"). Isi angka > 0 untuk mengaktifkan kembali pembatasannya.
+  // 0 = NONAKTIF untuk API umum & reset password. Khusus login, proteksi
+  // selalu aktif dengan default 5 percobaan gagal / 15 menit bila 0/kosong.
   rateLimitWindowMinutes: Number(process.env.RATE_LIMIT_WINDOW_MINUTES ?? 15),
   apiRateLimit: Number(process.env.API_RATE_LIMIT ?? 0),
-  loginRateLimit: Number(process.env.LOGIN_RATE_LIMIT ?? 0),
+  loginRateLimit: Number(process.env.LOGIN_RATE_LIMIT ?? 5),
   passwordResetRateLimit: Number(process.env.PASSWORD_RESET_RATE_LIMIT ?? 0),
 
   // ---- Google Sheets (poin 3) ----

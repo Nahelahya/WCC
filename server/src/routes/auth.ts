@@ -26,21 +26,30 @@ import {
  * pembatasan dimatikan sehingga tidak ada blokir sementara untuk pemakaian
  * normal. Isi nilainya > 0 di .env untuk mengaktifkan kembali.
  */
-function maybeRateLimit(limit: number, message: string): RequestHandler {
-  if (!(limit > 0)) return (_req, _res, next) => next()
+function maybeRateLimit(
+  limit: number,
+  message: string,
+  options: { skipSuccessfulRequests?: boolean; fallback?: number } = {},
+): RequestHandler {
+  const effective = limit > 0 ? limit : (options.fallback ?? 0)
+  if (!(effective > 0)) return (_req, _res, next) => next()
   return rateLimit({
     windowMs: env.rateLimitWindowMinutes * 60 * 1000,
-    limit,
+    limit: effective,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     message: { message },
+    ...(options.skipSuccessfulRequests ? { skipSuccessfulRequests: true } : {}),
   })
 }
 
-// Membatasi percobaan login untuk mencegah brute force.
+// Membatasi percobaan login untuk mencegah brute force. Hanya percobaan yang
+// gagal yang dihitung, sehingga login yang berhasil tidak mengurangi kuota.
+// Nilai 0/kosong tetap memakai default 5 agar proteksi selalu aktif.
 const loginLimiter = maybeRateLimit(
   env.loginRateLimit,
   'Terlalu banyak percobaan masuk. Silakan coba lagi beberapa menit lagi.',
+  { skipSuccessfulRequests: true, fallback: 5 },
 )
 
 // Membatasi permintaan tautan reset agar tidak disalahgunakan untuk spam email.
