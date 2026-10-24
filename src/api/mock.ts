@@ -973,6 +973,12 @@ export const landingApi = {
   async get(): Promise<any> {
     return delay({ ...read().landing, updatedAt: new Date().toISOString(), updatedByName: 'Pengurus Demo' })
   },
+  async stats(): Promise<{ activeMembers: number; coachCount: number }> {
+    const db = read()
+    const activeMembers = db.users.filter((u) => u.role === 'anggota' && u.membershipStatus === 'aktif').length
+    const coachCount = db.users.filter((u) => u.role === 'coach').length
+    return delay({ activeMembers, coachCount })
+  },
   async update(data: any): Promise<any> {
     return delay(
       mutate((db: any) => {
@@ -980,13 +986,6 @@ export const landingApi = {
         return { ...db.landing, updatedAt: new Date().toISOString(), updatedByName: 'Pengurus Demo' }
       }),
     )
-  },
-  async stats(): Promise<{ members: number; coaches: number }> {
-    const db = read()
-    return delay({
-      members: (db.users ?? []).filter((u: any) => u.role === 'anggota' && (u.membershipStatus ?? 'aktif') === 'aktif').length,
-      coaches: (db.coaches ?? []).length,
-    })
   },
 }
 

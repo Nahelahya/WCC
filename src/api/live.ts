@@ -544,14 +544,14 @@ export const landingApi = {
   async get(): Promise<any> {
     return request('/landing')
   },
+  async stats(): Promise<{ activeMembers: number; coachCount: number }> {
+    return request('/landing/stats')
+  },
   async update(data: any): Promise<any> {
     return request('/landing', {
       method: 'PUT',
       body: JSON.stringify(data),
     })
-  },
-  async stats(): Promise<{ members: number; coaches: number }> {
-    return request('/landing/stats')
   },
 }
 

@@ -8,6 +8,20 @@ import type { LandingContent } from '../types.landing'
 
 export const landingRouter = Router()
 
+// Statistik publik (tanpa autentikasi) untuk ditampilkan di landing page.
+landingRouter.get(
+  '/stats',
+  wrap(async (_req, res) => {
+    const { rows: m } = await query<{ total: number }>(
+      "select count(*)::int as total from users where role = 'anggota' and membership_status = 'aktif'",
+    )
+    const { rows: c } = await query<{ total: number }>(
+      "select count(*)::int as total from users where role = 'coach'",
+    )
+    res.json({ activeMembers: m[0]?.total ?? 0, coachCount: c[0]?.total ?? 0 })
+  }),
+)
+
 const linkSchema = z.object({
   label: z.string().trim().min(1).max(120),
   href: z.string().trim().min(1).max(500),
@@ -162,19 +176,6 @@ landingRouter.get(
       updatedAt: rows[0]?.updated_at ?? undefined,
       updatedByName: rows[0]?.updated_by_name ?? null,
     } as any)
-  }),
-)
-
-landingRouter.get(
-  '/stats',
-  wrap(async (_req, res) => {
-    const { rows: m } = await query<{ total: number }>(
-      "select count(*)::int as total from users where role = 'anggota' and membership_status = 'aktif'",
-    )
-    const { rows: c } = await query<{ total: number }>(
-      'select count(*)::int as total from coaches',
-    )
-    res.json({ members: m[0]?.total ?? 0, coaches: c[0]?.total ?? 0 })
   }),
 )
 

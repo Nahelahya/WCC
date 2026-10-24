@@ -32,6 +32,7 @@ export function AttendanceScanPanel() {
   const [lastResult, setLastResult] = useState<ScanResult | null>(null)
   const [manualQuery, setManualQuery] = useState('')
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
+  const [zoom, setZoom] = useState(1.6)
   const [pendingSync, setPendingSync] = useState(0)
 
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -168,7 +169,7 @@ export function AttendanceScanPanel() {
     try {
       const reader = new BrowserQRCodeReader()
       const controls = await reader.decodeFromConstraints(
-        { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } },
+        { video: { facingMode: 'environment' } },
         videoRef.current,
         (result) => {
           if (result) {
@@ -177,19 +178,20 @@ export function AttendanceScanPanel() {
         },
       )
       controlsRef.current = controls
-      // Auto-zoom: aktifkan zoom kamera bila didukung perangkat.
+      setScanning(true)
+      // Coba zoom native (auto-zoom) jika perangkat mendukung.
       try {
-        const stream = videoRef.current.srcObject as MediaStream | null
-        const track = stream?.getVideoTracks?.()[0]
-        const caps = (track as any)?.getCapabilities?.()
-        if (caps && typeof caps.zoom === 'object' && caps.zoom?.max) {
-          const zoom = Math.min(caps.zoom.max, Math.max(caps.zoom.min ?? 1, 2))
-          await (track as any).applyConstraints({ advanced: [{ zoom }] }).catch(() => undefined)
+        const video = videoRef.current
+        const stream = video?.srcObject as MediaStream | null
+        const track = stream && typeof stream.getVideoTracks === 'function' ? stream.getVideoTracks()[0] : null
+        const caps = track && typeof track.getCapabilities === 'function' ? (track.getCapabilities() as any) : null
+        if (caps && caps.zoom) {
+          const z = Math.min(Math.max(zoom, caps.zoom.min ?? 1), caps.zoom.max ?? zoom)
+          await (track as any).applyConstraints({ zoom: z }).catch(() => {})
         }
       } catch {
-        /* perangkat tidak mendukung zoom */
+        /* perangkat tidak mendukung zoom native; pakai zoom digital */
       }
-      setScanning(true)
     } catch (err: any) {
       setCameraError(err?.message ?? 'Kamera tidak dapat diakses.')
       setScanning(false)
@@ -280,15 +282,25 @@ export function AttendanceScanPanel() {
       ) : (
         <>
           <div className="card mb-4 overflow-hidden">
-            <div className="relative aspect-[4/3] w-full bg-black">
-              <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
+            <div className="relative aspect-[4/3] w-full overflow-hidden bg-black">
+              <video ref={videoRef} className="h-full w-full object-cover" style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }} playsInline muted />
               {!scanning && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white">
                   <p className="text-sm">Kamera belum aktif</p>
                 </div>
               )}
             </div>
-            <div className="flex flex-wrap gap-2 p-3">
+            <div className="flex flex-wrap items-center gap-3 p-3">
+              <label className="text-[12.5px] text-muted">Zoom: {zoom.toFixed(1)}x</label>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.1}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                className="w-40"
+              />
               {!scanning ? (
                 <Button icon="camera" onClick={startScan} disabled={!sessionId}>
                   Mulai Scan

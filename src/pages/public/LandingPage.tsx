@@ -42,7 +42,7 @@ export function LandingPage() {
   const landing = useAsync(() => landingApi.get(), [])
   const sessions = useAsync(() => sessionApi.list(), [])
   const coaches = useAsync(() => coachApi.list(), [])
-  const clubStats = useAsync(() => landingApi.stats(), [])
+  const liveStats = useAsync(() => landingApi.stats(), [])
   const today = todayISO()
 
   const content: LandingContent = (landing.data as LandingContent | null) ?? getLandingDefaults()
@@ -157,6 +157,24 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* Statistik anggota (real-time) */}
+      <section className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-10 sm:px-6 sm:py-12">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="card p-5 text-center">
+            <p className="text-[32px] font-bold text-primary">
+              {liveStats.loading ? '…' : (liveStats.data?.activeMembers ?? 0).toLocaleString('id-ID')}
+            </p>
+            <p className="mt-1 text-[14px] text-muted">Anggota Aktif</p>
+          </div>
+          <div className="card p-5 text-center">
+            <p className="text-[32px] font-bold text-primary">
+              {liveStats.loading ? '…' : (liveStats.data?.coachCount ?? 0).toLocaleString('id-ID')}
+            </p>
+            <p className="mt-1 text-[14px] text-muted">Coach</p>
+          </div>
+        </div>
+      </section>
+
       {/* Harga */}
       <section id="harga" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-14 sm:px-6 sm:py-16">
         <div className="text-center">
@@ -184,20 +202,6 @@ export function LandingPage() {
             <p className="mt-2 text-[28px] font-bold text-primary">Rp60.000</p>
             <p className="mt-1 text-[13px] text-muted">per bulan (boleh dicicil)</p>
             <p className="mt-3 text-[13px] text-muted">Iuran kas bulanan anggota.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Statistik real-time */}
-      <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="card p-6 text-center">
-            <p className="text-[32px] font-bold text-primary">{clubStats.data?.members ?? '—'}</p>
-            <p className="mt-1 text-[13.5px] text-muted">Anggota Aktif</p>
-          </div>
-          <div className="card p-6 text-center">
-            <p className="text-[32px] font-bold text-primary">{clubStats.data?.coaches ?? '—'}</p>
-            <p className="mt-1 text-[13.5px] text-muted">Coach</p>
           </div>
         </div>
       </section>
