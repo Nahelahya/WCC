@@ -18,6 +18,7 @@ import type {
   CheckoutInput,
   CheckoutResult,
   CreateUserInput,
+  DuesMemberList,
   ManualDuesInput,
   MemberDues,
   MyPayments,
@@ -450,6 +451,11 @@ export const paymentApi = {
   /** Ringkasan iuran satu anggota untuk sebuah periode (khusus pengurus). */
   async member(userId: string, period?: string): Promise<MemberDues> {
     return request(`/payments/member/${encodeURIComponent(userId)}${query({ period })}`)
+  },
+
+  /** Anggota aktif yang masih punya sisa iuran pada periode (khusus pengurus). */
+  async duesList(period?: string): Promise<DuesMemberList> {
+    return request(`/payments/dues${query({ period })}`)
   },
 
   /**

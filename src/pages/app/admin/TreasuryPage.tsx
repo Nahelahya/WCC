@@ -1,19 +1,19 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { treasuryApi, syncApi, uploadApi, type TreasurySummary } from '@/api/client'
+import { treasuryApi, syncApi, uploadApi, paymentApi, type TreasurySummary } from '@/api/client'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useAsync, errorMessage } from '@/lib/hooks'
 import { PageHeader, SectionHeader } from '@/components/layout/PageHeader'
 import { StatCard } from '@/components/cards/StatCard'
 import { DataTable, Pagination, type Column } from '@/components/ui/DataTable'
-import { Alert } from '@/components/ui/Feedback'
+import { Alert, EmptyState, ErrorState, ListSkeleton } from '@/components/ui/Feedback'
 import { Button } from '@/components/ui/Button'
 import { Input, Select, Textarea } from '@/components/ui/Field'
 import { Modal, ConfirmDialog } from '@/components/ui/Modal'
 import { Icon } from '@/components/ui/Icon'
 import { StatusBadge } from '@/components/ui/StatusBadge'
-import { formatDateID, formatDateTimeID, formatRupiah, todayISO } from '@/lib/date'
+import { currentMonth, formatDateID, formatDateTimeID, formatMonthID, formatRupiah, todayISO } from '@/lib/date'
 import type { Transaction, TransactionType } from '@/types'
 
 const INCOME_CATEGORIES = ['Iuran Anggota', 'Donasi', 'Sponsor', 'Lain-lain']
@@ -29,6 +29,9 @@ interface FormState {
   receiptName?: string
   receiptUrl?: string
 }
+
+/** Mode pada modal: transaksi pemasukan/pengeluaran atau pencatatan iuran kas. */
+type FormMode = TransactionType | 'kas'
 
 const EMPTY: FormState = {
   type: 'pemasukan',
@@ -65,6 +68,7 @@ export function TreasuryPage() {
   const sync = useAsync(() => (isManager ? syncApi.get() : Promise.resolve(null)), [isManager])
 
   const [formOpen, setFormOpen] = useState(false)
+  const [formMode, setFormMode] = useState<FormMode>('pemasukan')
   const [form, setForm] = useState<FormState>(EMPTY)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [saving, setSaving] = useState(false)
@@ -72,7 +76,30 @@ export function TreasuryPage() {
   const [deleting, setDeleting] = useState(false)
   const [uploadingReceipt, setUploadingReceipt] = useState(false)
 
+  // Pencatatan iuran tunai (mode "Kas" pada modal Catat Transaksi).
+  const [kasPeriod, setKasPeriod] = useState(currentMonth())
+  const [kasQuery, setKasQuery] = useState('')
+  const [kasUserId, setKasUserId] = useState('')
+  const [kasAmount, setKasAmount] = useState('')
+  const [kasSaving, setKasSaving] = useState(false)
+
   const categories = form.type === 'pemasukan' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+
+  // Daftar anggota bertunggakan hanya dimuat saat modal dibuka dalam mode Kas.
+  const kasDues = useAsync(
+    () =>
+      formOpen && formMode === 'kas' ? paymentApi.duesList(kasPeriod) : Promise.resolve(null),
+    [formOpen, formMode, kasPeriod],
+  )
+
+  const kasMembers = useMemo(() => {
+    const q = kasQuery.trim().toLowerCase()
+    const members = kasDues.data?.members ?? []
+    return q ? members.filter((m) => m.name.toLowerCase().includes(q)) : members
+  }, [kasDues.data, kasQuery])
+
+  const kasSelected = kasDues.data?.members.find((m) => m.id === kasUserId) ?? null
+  const kasAmountValue = Number(kasAmount.replace(/\D/g, '')) || 0
 
   const rows = useMemo(() => {
     let data = list.data ?? []
@@ -92,7 +119,12 @@ export function TreasuryPage() {
 
   function openCreate() {
     setForm({ ...EMPTY, date: todayISO() })
+    setFormMode('pemasukan')
     setErrors({})
+    setKasPeriod(currentMonth())
+    setKasQuery('')
+    setKasUserId('')
+    setKasAmount('')
     setFormOpen(true)
   }
 
@@ -107,8 +139,58 @@ export function TreasuryPage() {
       receiptName: t.receiptName,
       receiptUrl: t.receiptUrl,
     })
+    setFormMode(t.type)
     setErrors({})
     setFormOpen(true)
+  }
+
+  /** Mengganti mode modal: pemasukan, pengeluaran, atau pencatatan iuran kas. */
+  function selectMode(mode: FormMode) {
+    setFormMode(mode)
+    if (mode === 'kas') {
+      setErrors({})
+      return
+    }
+    setForm({
+      ...form,
+      type: mode,
+      category: mode === 'pemasukan' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0],
+    })
+  }
+
+  function selectKasMember(id: string) {
+    const member = kasDues.data?.members.find((m) => m.id === id)
+    setKasUserId(id)
+    // PUT /manual menyimpan TOTAL tunai periode ini (menimpa catatan lama),
+    // jadi nominal diisi dengan tunai sebelumnya + sisa iuran.
+    setKasAmount(member ? String(member.cashAmount + member.outstanding) : '')
+  }
+
+  async function submitKas() {
+    if (kasSaving || !kasSelected) return
+    if (kasAmountValue <= 0) {
+      toast('Nominal kas harus lebih dari 0.', 'error')
+      return
+    }
+    setKasSaving(true)
+    try {
+      await paymentApi.saveManual({
+        userId: kasSelected.id,
+        period: kasPeriod,
+        amount: kasAmountValue,
+      })
+      toast(`Kas ${kasSelected.name} untuk ${formatMonthID(kasPeriod)} berhasil dicatat.`, 'success')
+      setFormOpen(false)
+      setKasUserId('')
+      setKasAmount('')
+      list.reload()
+      summary.reload()
+      kasDues.reload()
+    } catch (err) {
+      toast(errorMessage(err), 'error')
+    } finally {
+      setKasSaving(false)
+    }
   }
 
   async function onReceiptChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -384,153 +466,306 @@ export function TreasuryPage() {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={form.id ? 'Ubah Transaksi' : 'Catat Transaksi Kas'}
-        description="Nominal menggunakan Rupiah tanpa titik pemisah."
+        description={
+          formMode === 'kas'
+            ? 'Pilih anggota yang membayar iuran tunai pada periode ini.'
+            : 'Nominal menggunakan Rupiah tanpa titik pemisah.'
+        }
         footer={
           <>
-            <Button variant="secondary" onClick={() => setFormOpen(false)} disabled={saving}>
+            <Button
+              variant="secondary"
+              onClick={() => setFormOpen(false)}
+              disabled={saving || kasSaving}
+            >
               Batal
             </Button>
-            <Button form="trx-form" type="submit" loading={saving}>
-              {form.id ? 'Simpan Perubahan' : 'Simpan Transaksi'}
-            </Button>
+            {formMode === 'kas' ? (
+              <Button
+                onClick={() => void submitKas()}
+                loading={kasSaving}
+                disabled={!kasSelected || kasAmountValue <= 0}
+              >
+                Simpan Kas
+              </Button>
+            ) : (
+              <Button form="trx-form" type="submit" loading={saving}>
+                {form.id ? 'Simpan Perubahan' : 'Simpan Transaksi'}
+              </Button>
+            )}
           </>
         }
       >
-        <form id="trx-form" onSubmit={submit} className="space-y-4" noValidate>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(['pemasukan', 'pengeluaran'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() =>
-                  setForm({
-                    ...form,
-                    type: t,
-                    category: t === 'pemasukan' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0],
-                  })
-                }
-                aria-pressed={form.type === t}
-                className={`flex items-center gap-3 rounded-control border p-3 text-left transition-colors ${
-                  form.type === t
-                    ? t === 'pemasukan'
-                      ? 'border-success bg-success/10'
-                      : 'border-danger bg-danger/10'
-                    : 'border-line bg-surface hover:bg-bg'
+        <div className={`grid gap-3 ${isManager && !form.id ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+          {(['pemasukan', 'pengeluaran'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => selectMode(t)}
+              aria-pressed={formMode === t}
+              className={`flex items-center gap-3 rounded-control border p-3 text-left transition-colors ${
+                formMode === t
+                  ? t === 'pemasukan'
+                    ? 'border-success bg-success/10'
+                    : 'border-danger bg-danger/10'
+                  : 'border-line bg-surface hover:bg-bg'
+              }`}
+            >
+              <span
+                className={`flex h-9 w-9 items-center justify-center rounded-control ${
+                  t === 'pemasukan' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
                 }`}
               >
-                <span
-                  className={`flex h-9 w-9 items-center justify-center rounded-control ${
-                    t === 'pemasukan' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
-                  }`}
-                >
-                  <Icon name={t === 'pemasukan' ? 'plus' : 'arrow-right'} size={18} />
+                <Icon name={t === 'pemasukan' ? 'plus' : 'arrow-right'} size={18} />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold capitalize text-ink">{t}</span>
+                <span className="block text-[12px] text-muted">
+                  {t === 'pemasukan' ? 'Iuran, donasi, sponsor' : 'Sewa, alat, konsumsi, event'}
                 </span>
-                <span>
-                  <span className="block text-sm font-semibold capitalize text-ink">{t}</span>
-                  <span className="block text-[12px] text-muted">
-                    {t === 'pemasukan' ? 'Iuran, donasi, sponsor' : 'Sewa, alat, konsumsi, event'}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <Select
-            label="Kategori"
-            value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
-            error={errors.category}
-            required
-          >
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </Select>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="Tanggal"
-              type="date"
-              max={todayISO()}
-              value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })}
-              error={errors.date}
-              required
-            />
-            <Input
-              label="Nominal"
-              inputMode="numeric"
-              prefix="Rp"
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value.replace(/[^\d]/g, '') })}
-              error={errors.amount}
-              placeholder="150000"
-              required
-            />
-          </div>
-
-          {form.amount && Number(form.amount) > 0 && (
-            <p className="rounded-control bg-bg px-3 py-2 text-[13px] text-muted">
-              Dibaca sebagai <span className="font-semibold text-ink">{formatRupiah(Number(form.amount))}</span>
-            </p>
+              </span>
+            </button>
+          ))}
+          {isManager && !form.id && (
+            <button
+              type="button"
+              onClick={() => selectMode('kas')}
+              aria-pressed={formMode === 'kas'}
+              className={`flex items-center gap-3 rounded-control border p-3 text-left transition-colors ${
+                formMode === 'kas'
+                  ? 'border-primary bg-primary/10'
+                  : 'border-line bg-surface hover:bg-bg'
+              }`}
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-control bg-primary/15 text-primary">
+                <Icon name="wallet" size={18} />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-ink">Kas</span>
+                <span className="block text-[12px] text-muted">Iuran tunai anggota</span>
+              </span>
+            </button>
           )}
+        </div>
 
-          <Textarea
-            label="Keterangan"
-            value={form.note}
-            onChange={(e) => setForm({ ...form, note: e.target.value })}
-            placeholder="Misalnya: iuran bulanan 5 anggota"
-          />
-
-          <div>
-            <span className="field-label">Bukti transaksi (opsional)</span>
-            <label className="flex cursor-pointer items-center gap-3 rounded-control border border-dashed border-line bg-bg/50 px-3 py-3 text-sm text-muted hover:border-primary/40">
-              <Icon name="image" size={19} />
-              <span className="min-w-0 flex-1 truncate">
-                {uploadingReceipt ? 'Mengunggah…' : form.receiptName || 'Pilih berkas gambar/PDF…'}
-              </span>
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                className="sr-only"
-                disabled={uploadingReceipt}
-                onChange={(e) => void onReceiptChange(e)}
+        {formMode === 'kas' ? (
+          <div className="mt-4 space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Periode kas"
+                type="month"
+                value={kasPeriod}
+                onChange={(e) => {
+                  if (!e.target.value) return
+                  setKasPeriod(e.target.value)
+                  setKasUserId('')
+                  setKasAmount('')
+                }}
               />
-              <span className="flex-none rounded-control border border-line bg-surface px-2.5 py-1 text-[12.5px] font-semibold text-ink">
-                {uploadingReceipt ? 'Tunggu' : form.receiptName ? 'Ganti' : 'Pilih'}
-              </span>
-            </label>
-            {form.receiptUrl && (
-              <div className="mt-2 flex items-center gap-4 text-[12.5px]">
-                <a
-                  href={form.receiptUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link inline-flex items-center gap-1.5"
-                >
-                  <Icon name="eye" size={15} /> Lihat bukti terunggah
-                </a>
-                <button
-                  type="button"
-                  className="text-muted hover:text-danger"
-                  onClick={() => setForm((f) => ({ ...f, receiptName: undefined, receiptUrl: undefined }))}
-                >
-                  Hapus
-                </button>
+              <Input
+                label="Cari anggota"
+                value={kasQuery}
+                onChange={(e) => setKasQuery(e.target.value)}
+                placeholder="Ketik nama anggota…"
+                helper={`${formatMonthID(kasPeriod)} · iuran ${formatRupiah(
+                  kasDues.data?.monthlyAmount ?? 0,
+                )}`}
+              />
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="field-label">Anggota dengan sisa iuran</span>
+                <span className="text-[12px] text-muted">
+                  {kasDues.loading ? 'Memuat…' : `${kasMembers.length} anggota`}
+                </span>
+              </div>
+
+              {kasDues.error ? (
+                <ErrorState message={kasDues.error} onRetry={() => kasDues.reload()} />
+              ) : kasDues.loading && !kasDues.data ? (
+                <ListSkeleton rows={4} />
+              ) : kasMembers.length === 0 ? (
+                <EmptyState
+                  icon="check-circle"
+                  title={kasQuery ? 'Anggota tidak ditemukan' : 'Semua iuran lunas'}
+                  description={
+                    kasQuery
+                      ? 'Coba kata kunci lain atau ubah periode.'
+                      : `Tidak ada anggota aktif dengan tunggakan pada ${formatMonthID(kasPeriod)}.`
+                  }
+                />
+              ) : (
+                <ul className="max-h-64 divide-y divide-line overflow-y-auto rounded-control border border-line">
+                  {kasMembers.map((m) => {
+                    const active = m.id === kasUserId
+                    return (
+                      <li key={m.id}>
+                        <button
+                          type="button"
+                          onClick={() => selectKasMember(m.id)}
+                          aria-pressed={active}
+                          className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors ${
+                            active ? 'bg-primary/10' : 'hover:bg-bg'
+                          }`}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-[13.5px] font-medium text-ink">
+                              {m.name}
+                            </span>
+                            <span className="block text-[11.5px] text-muted">
+                              Dibayar {formatRupiah(m.paidAmount)}
+                              {m.cashAmount > 0 ? ` · tunai ${formatRupiah(m.cashAmount)}` : ''}
+                            </span>
+                          </span>
+                          <span className="flex-none text-right">
+                            <span className="block text-[11px] text-muted">Sisa</span>
+                            <span className="block text-[13px] font-semibold text-ink">
+                              {formatRupiah(m.outstanding)}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {kasSelected && (
+              <div className="rounded-control border border-primary/25 bg-primary/5 p-3">
+                <p className="text-[12.5px] text-muted">
+                  Mencatat kas untuk{' '}
+                  <span className="font-semibold text-ink">{kasSelected.name}</span> ·{' '}
+                  {formatMonthID(kasPeriod)}
+                </p>
+                <div className="mt-3 sm:max-w-[280px]">
+                  <Input
+                    label="Total dibayar tunai"
+                    inputMode="numeric"
+                    prefix="Rp"
+                    value={kasAmount}
+                    onChange={(e) => setKasAmount(e.target.value.replace(/[^\d]/g, ''))}
+                    placeholder="0"
+                    helper="Nominal kumulatif tunai periode ini (menimpa catatan tunai sebelumnya)."
+                  />
+                </div>
+                {kasAmountValue > 0 && (
+                  <p className="mt-2 text-[12.5px] text-muted">
+                    Dibaca sebagai{' '}
+                    <span className="font-semibold text-ink">{formatRupiah(kasAmountValue)}</span>
+                    {kasAmountValue > kasSelected.cashAmount + kasSelected.outstanding && (
+                      <span className="text-warning"> · melebihi sisa iuran</span>
+                    )}
+                  </p>
+                )}
               </div>
             )}
-            <p className="field-helper">
-              Berkas gambar atau PDF (maks. 5 MB) diunggah ke server dan disimpan sebagai bukti transaksi.
-            </p>
-          </div>
 
-          <Alert tone="warning" title="Perhatian">
-            Pastikan nominal dan tipe transaksi sudah benar. Perubahan dan penghapusan transaksi dicatat dalam
-            audit log beserta waktu dan identitas pencatat.
-          </Alert>
-        </form>
+            <Alert tone="info">
+              Iuran tunai yang disimpan otomatis tercatat sebagai pemasukan "Iuran Anggota" di Kas
+              &amp; Treasury.
+            </Alert>
+          </div>
+        ) : (
+          <form id="trx-form" onSubmit={submit} className="mt-4 space-y-4" noValidate>
+            <Select
+              label="Kategori"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              error={errors.category}
+              required
+            >
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Tanggal"
+                type="date"
+                max={todayISO()}
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                error={errors.date}
+                required
+              />
+              <Input
+                label="Nominal"
+                inputMode="numeric"
+                prefix="Rp"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value.replace(/[^\d]/g, '') })}
+                error={errors.amount}
+                placeholder="150000"
+                required
+              />
+            </div>
+
+            {form.amount && Number(form.amount) > 0 && (
+              <p className="rounded-control bg-bg px-3 py-2 text-[13px] text-muted">
+                Dibaca sebagai <span className="font-semibold text-ink">{formatRupiah(Number(form.amount))}</span>
+              </p>
+            )}
+
+            <Textarea
+              label="Keterangan"
+              value={form.note}
+              onChange={(e) => setForm({ ...form, note: e.target.value })}
+              placeholder="Misalnya: iuran bulanan 5 anggota"
+            />
+
+            <div>
+              <span className="field-label">Bukti transaksi (opsional)</span>
+              <label className="flex cursor-pointer items-center gap-3 rounded-control border border-dashed border-line bg-bg/50 px-3 py-3 text-sm text-muted hover:border-primary/40">
+                <Icon name="image" size={19} />
+                <span className="min-w-0 flex-1 truncate">
+                  {uploadingReceipt ? 'Mengunggah…' : form.receiptName || 'Pilih berkas gambar/PDF…'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="sr-only"
+                  disabled={uploadingReceipt}
+                  onChange={(e) => void onReceiptChange(e)}
+                />
+                <span className="flex-none rounded-control border border-line bg-surface px-2.5 py-1 text-[12.5px] font-semibold text-ink">
+                  {uploadingReceipt ? 'Tunggu' : form.receiptName ? 'Ganti' : 'Pilih'}
+                </span>
+              </label>
+              {form.receiptUrl && (
+                <div className="mt-2 flex items-center gap-4 text-[12.5px]">
+                  <a
+                    href={form.receiptUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="link inline-flex items-center gap-1.5"
+                  >
+                    <Icon name="eye" size={15} /> Lihat bukti terunggah
+                  </a>
+                  <button
+                    type="button"
+                    className="text-muted hover:text-danger"
+                    onClick={() => setForm((f) => ({ ...f, receiptName: undefined, receiptUrl: undefined }))}
+                  >
+                    Hapus
+                  </button>
+                </div>
+              )}
+              <p className="field-helper">
+                Berkas gambar atau PDF (maks. 5 MB) diunggah ke server dan disimpan sebagai bukti transaksi.
+              </p>
+            </div>
+
+            <Alert tone="warning" title="Perhatian">
+              Pastikan nominal dan tipe transaksi sudah benar. Perubahan dan penghapusan transaksi dicatat dalam
+              audit log beserta waktu dan identitas pencatat.
+            </Alert>
+          </form>
+        )}
       </Modal>
 
       <ConfirmDialog

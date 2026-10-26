@@ -12,7 +12,6 @@ import { Input, Select } from '@/components/ui/Field'
 import { Modal, ConfirmDialog } from '@/components/ui/Modal'
 import { StatusBadge, type StatusTone } from '@/components/ui/StatusBadge'
 import { MemberIdCard } from '@/components/cards/MemberIdCard'
-import { MemberDuesPanel } from '@/components/payments/MemberDuesPanel'
 import { ROLE_LABEL } from '@/components/layout/nav'
 import { formatDateID } from '@/lib/date'
 import type { Role, User } from '@/types'
@@ -560,10 +559,6 @@ export function UsersPage() {
               <p className="text-[12px] text-muted">Riwayat penyakit</p>
               <p className="mt-1 text-sm text-ink">{detail.medicalHistory || '—'}</p>
             </div>
-
-            {detail.role === 'anggota' && (
-              <MemberDuesPanel userId={detail.id} userName={detail.name} />
-            )}
 
             {(detail.role === 'anggota' || detail.role === 'coach' || detail.role === 'pengurus') && (
               <div className="rounded-control border border-line p-3">

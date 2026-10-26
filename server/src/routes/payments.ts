@@ -9,6 +9,7 @@
  *                                        iuran bulanan, periode berjalan)
  *   GET  /api/payments                   daftar semua (pengurus)
  *   GET  /api/payments/member/:userId    ringkasan iuran satu anggota (pengurus)
+ *   GET  /api/payments/dues              anggota bertunggakan periode ini (pengurus)
  *   PUT  /api/payments/manual            catat/ubah iuran tunai (pengurus)
  *
  * Alur:
@@ -855,5 +856,61 @@ paymentRouter.put(
     }).catch(() => {})
 
     res.json(await memberDuesView(input.userId, input.period))
+  }),
+)
+
+/**
+ * Daftar anggota aktif yang masih punya sisa iuran pada periode tertentu.
+ *
+ * Dipakai modal "Catat Transaksi Kas": pengurus bisa langsung memilih anggota
+ * yang membayar tunai tanpa membuka detail anggota satu per satu.
+ */
+paymentRouter.get(
+  '/dues',
+  requireAuth,
+  requireRole('pengurus'),
+  wrap(async (req, res) => {
+    const period =
+      z.object({ period: periodSchema.optional() }).parse(req.query ?? {}).period ?? currentPeriod()
+    await expireStalePayments()
+
+    const monthly = Math.max(0, Math.round(env.monthlyDues))
+    const { rows } = await query<{ id: string; name: string; paid: number; cash: number }>(
+      `select u.id,
+              u.name,
+              coalesce(p.paid, 0)::numeric as paid,
+              coalesce(p.cash, 0)::numeric as cash
+         from users u
+         left join (
+           select user_id,
+                  sum(amount) as paid,
+                  sum(case when channel = 'cash' then amount else 0 end) as cash
+             from payments
+            where purpose = 'iuran' and status = 'paid'
+              and period = $1 and user_id is not null
+            group by user_id
+         ) p on p.user_id = u.id
+        where u.role = 'anggota' and u.membership_status = 'aktif'
+        order by u.name asc`,
+      [period],
+    )
+
+    const members = rows
+      .map((row) => {
+        const paidAmount = Number(row.paid)
+        const outstanding = Math.max(0, monthly - paidAmount)
+        return {
+          id: row.id,
+          name: row.name,
+          paidAmount,
+          cashAmount: Number(row.cash),
+          outstanding,
+          status: outstanding <= 0 && monthly > 0 ? 'lunas' : paidAmount > 0 ? 'sebagian' : 'belum',
+        }
+      })
+      // Hanya yang masih memiliki tunggakan pada periode ini.
+      .filter((member) => member.outstanding > 0)
+
+    res.json({ period, monthlyAmount: monthly, members })
   }),
 )

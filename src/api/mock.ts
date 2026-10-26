@@ -21,6 +21,7 @@ import type {
   CheckoutInput,
   CheckoutResult,
   CreateUserInput,
+  DuesMemberList,
   DuesState,
   ManualDuesInput,
   MemberDues,
@@ -799,6 +800,28 @@ export const paymentApi = {
     const user = db.users.find((u) => u.id === userId)
     if (!user) return fail('Anggota tidak ditemukan.', 404)
     return delay(memberDuesSnapshot(userId, user.name, period ?? periodNow()))
+  },
+
+  /** Anggota aktif yang masih punya sisa iuran pada periode (khusus pengurus). */
+  async duesList(period?: string): Promise<DuesMemberList> {
+    const db = read()
+    const p = period ?? periodNow()
+    const members = db.users
+      .filter((u) => u.role === 'anggota' && (u.membershipStatus ?? 'aktif') === 'aktif')
+      .map((u) => {
+        const snap = memberDuesSnapshot(u.id, u.name, p)
+        return {
+          id: u.id,
+          name: u.name,
+          paidAmount: snap.dues.paidAmount,
+          cashAmount: snap.manualAmount,
+          outstanding: snap.dues.outstanding,
+          status: snap.dues.status,
+        }
+      })
+      .filter((m) => m.outstanding > 0)
+      .sort((a, b) => a.name.localeCompare(b.name))
+    return delay({ period: p, monthlyAmount: DEMO_MONTHLY_DUES, members })
   },
 
   /** Mencatat/mengubah iuran tunai; amount 0 menghapus catatan periode itu. */

@@ -165,6 +165,26 @@ export interface ManualDuesInput {
   amount: number
 }
 
+/** Satu anggota yang masih memiliki sisa iuran pada periode terpilih. */
+export interface DuesMember {
+  id: string
+  name: string
+  /** Total yang sudah dibayar (online + tunai) pada periode ini. */
+  paidAmount: number
+  /** Bagian yang sudah dibayar tunai pada periode ini. */
+  cashAmount: number
+  /** Sisa iuran yang belum dibayar. */
+  outstanding: number
+  status: 'lunas' | 'sebagian' | 'belum'
+}
+
+/** Daftar anggota dengan tunggakan iuran (dipakai modal Catat Transaksi Kas). */
+export interface DuesMemberList {
+  period: string
+  monthlyAmount: number
+  members: DuesMember[]
+}
+
 export interface AdminPayments {
   payments: Payment[]
   totals: { paid: number; pending: number }
