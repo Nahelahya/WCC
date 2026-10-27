@@ -62,9 +62,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       },
     })
   } catch {
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false
     throw Object.assign(
-      new Error('Tidak dapat menghubungi server API. Pastikan backend berjalan (folder server/).'),
-      { status: 0 },
+      new Error(
+        offline
+          ? 'Tidak ada koneksi internet. Periksa jaringan Anda, lalu coba lagi.'
+          : 'Tidak dapat menghubungi server. Pastikan backend berjalan (folder server/).',
+      ),
+      { status: 0, offline },
     )
   }
 

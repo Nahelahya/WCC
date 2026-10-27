@@ -106,7 +106,7 @@ export function ActivityCarousel({ items, autoPlayMs = 5000 }: ActivityCarouselP
           <button
             type="button"
             onClick={() => go(safeIndex - 1)}
-            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-surface/90 p-2 text-ink shadow-md ring-1 ring-line/60 transition hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-surface/80 p-2 text-ink shadow-md ring-1 ring-line/60 backdrop-blur transition hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             aria-label="Foto sebelumnya"
           >
             <Icon name="chevron-left" size={20} />
@@ -114,7 +114,7 @@ export function ActivityCarousel({ items, autoPlayMs = 5000 }: ActivityCarouselP
           <button
             type="button"
             onClick={() => go(safeIndex + 1)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-surface/90 p-2 text-ink shadow-md ring-1 ring-line/60 transition hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-surface/80 p-2 text-ink shadow-md ring-1 ring-line/60 backdrop-blur transition hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             aria-label="Foto berikutnya"
           >
             <Icon name="chevron-right" size={20} />
@@ -127,7 +127,7 @@ export function ActivityCarousel({ items, autoPlayMs = 5000 }: ActivityCarouselP
                 type="button"
                 onClick={() => go(i)}
                 className={`h-2 rounded-full transition-all ${
-                  i === safeIndex ? 'w-6 bg-brand' : 'w-2 bg-white/70 hover:bg-white'
+                  i === safeIndex ? 'w-6 bg-brand' : 'w-2 bg-ink/25 hover:bg-ink/40'
                 }`}
                 aria-label={`Lihat foto ${i + 1}`}
                 aria-current={i === safeIndex}

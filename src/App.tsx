@@ -26,9 +26,13 @@ import { UsersPage } from '@/pages/app/admin/UsersPage'
 import { PaymentsPage } from '@/pages/app/admin/PaymentsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
+import { OfflineBanner } from '@/components/ui/OfflineBanner'
+
 export function App() {
   return (
-    <Routes>
+    <>
+      <OfflineBanner />
+      <Routes>
       {/* Halaman publik */}
       <Route element={<PublicLayout />}>
         <Route path="/" element={<LandingPage />} />
@@ -68,5 +72,6 @@ export function App() {
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </>
   )
 }
