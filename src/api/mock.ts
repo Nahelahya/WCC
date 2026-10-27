@@ -34,6 +34,7 @@ import type {
   TreasurySummary,
   UpdateUserAccountInput,
   UploadResult,
+  WhatsAppSendResult,
 } from './types'
 
 /**
@@ -573,7 +574,11 @@ export const registrationApi = {
       }),
     )
   },
-  async setStatus(id: string, status: RegistrationStatus, internalNote?: string): Promise<Registration> {
+  async setStatus(
+    id: string,
+    status: RegistrationStatus,
+    internalNote?: string,
+  ): Promise<Registration & { whatsapp?: WhatsAppSendResult }> {
     return delay(
       mutate((db) => {
         const r = db.registrations.find((x) => x.id === id)
@@ -588,7 +593,25 @@ export const registrationApi = {
         }
         r.status = status
         if (internalNote !== undefined) r.internalNote = internalNote
-        return r
+        return {
+          ...r,
+          whatsapp:
+            status === 'diverifikasi'
+              ? { sent: true, detail: 'Mode demo: pesan WhatsApp disimulasikan.' }
+              : undefined,
+        }
+      }),
+    )
+  },
+  async sendWhatsApp(id: string): Promise<WhatsAppSendResult> {
+    return delay(
+      mutate((db) => {
+        const r = db.registrations.find((x) => x.id === id)
+        if (!r) throw new Error('Pendaftaran tidak ditemukan.')
+        if (r.status !== 'diverifikasi') {
+          throw new Error('Tautan grup hanya dikirim untuk pendaftaran yang sudah diverifikasi.')
+        }
+        return { sent: true, detail: 'Mode demo: pesan WhatsApp disimulasikan.' }
       }),
     )
   },

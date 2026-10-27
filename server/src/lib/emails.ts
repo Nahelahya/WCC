@@ -154,6 +154,10 @@ export function registrationDecisionEmail(
       : 'Setelah ditinjau, pendaftaran Anda belum dapat kami setujui saat ini.',
   ]
   if (note) lines.push('', `Catatan dari pengurus: ${note}`)
+  // Tautan grup juga disertakan di email sebagai cadangan bila WhatsApp gagal.
+  if (verified && env.waGroupLink) {
+    lines.push('', 'Bergabunglah ke grup WhatsApp klub lewat tautan berikut:', env.waGroupLink)
+  }
   lines.push('', SIGNATURE)
 
   const text = lines.join('\n')
@@ -162,6 +166,7 @@ export function registrationDecisionEmail(
       <p>${greetingHtml(fullName)}</p>
       <p>${verified ? 'Selamat! Pendaftaran Anda sebagai anggota <strong>WISANGGENI CLIMBING CLUB</strong> telah <strong>diverifikasi</strong>.' : 'Setelah ditinjau, pendaftaran Anda belum dapat kami setujui saat ini.'}</p>
       ${verified ? `<p>Akun Anda sudah <strong>aktif</strong>. Silakan <a href="${env.publicAppUrl}/masuk" style="color:#173F35;font-weight:600">masuk di sini</a> menggunakan email dan password yang Anda pilih saat mendaftar.</p>` : ''}
+      ${verified && env.waGroupLink ? `<p>Bergabunglah ke grup WhatsApp klub lewat <a href="${escapeHtml(env.waGroupLink)}" style="color:#173F35;font-weight:600">tautan berikut</a>.</p>` : ''}
       ${note ? `<p><strong>Catatan dari pengurus:</strong> ${escapeHtml(note)}</p>` : ''}
       <p>${signatureHtml()}</p>
     </div>`

@@ -190,6 +190,16 @@ export interface AdminPayments {
   totals: { paid: number; pending: number }
 }
 
+/** Hasil pengiriman WhatsApp (Fonnte) saat pendaftaran diverifikasi. */
+export interface WhatsAppSendResult {
+  sent: boolean
+  detail: string
+  /** True bila pengiriman dilewati karena konfigurasi server belum lengkap. */
+  skipped?: boolean
+  /** Tautan klik-ke-chat (wa.me) sebagai cadangan bila Fonnte tidak terkirim. */
+  waUrl?: string
+}
+
 /** Penyaring daftar pembayaran untuk halaman pengurus. */
 export interface PaymentAdminFilter {
   purpose?: PaymentPurpose

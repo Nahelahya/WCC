@@ -46,6 +46,17 @@ export const env = {
   /** Resource ID kotak surat (mis. `AC…`). Bila kosong, diambil otomatis dari `GET /api/v1/me`. */
   hostingerMailMailboxId: process.env.HOSTINGER_MAIL_MAILBOX_ID ?? '',
 
+  // ---- WhatsApp (Fonnte) ----
+  // Token device dari dashboard Fonnte (https://fonnte.com → Device → Token).
+  // Kosong = pengiriman WhatsApp nonaktif; pengurus tetap dapat mengirim link
+  // grup secara manual dari halaman Pendaftaran Anggota.
+  fonnteToken: process.env.FONNTE_TOKEN ?? '',
+  fonnteApiUrl: (process.env.FONNTE_API_URL ?? 'https://api.fonnte.com').replace(/\/+$/, ''),
+  /** Tautan undangan grup WhatsApp klub (mis. https://chat.whatsapp.com/xxxx). */
+  waGroupLink: process.env.WA_GROUP_LINK ?? 'https://chat.whatsapp.com/CkncDVy2Ly3ILLlfbWnCPE',
+  /** Nama grup, dipakai pada pesan WhatsApp. */
+  waGroupName: process.env.WA_GROUP_NAME ?? 'Grup WhatsApp WISANGGENI CLIMBING CLUB',
+
   // ---- Pembayaran online (DOKU Checkout) ----
   // Client-Id & Secret Key dari dashboard DOKU (Jokul). Kosong = pembayaran
   // online nonaktif; aplikasi tetap berjalan dengan pembayaran tunai.

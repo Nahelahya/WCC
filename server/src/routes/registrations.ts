@@ -11,6 +11,7 @@ import { emailVerifyOtpEmail, registrationDecisionEmail, registrationReceivedEma
 import { generateOtp, hashOtp } from '../lib/otp'
 import { requireAuth, requireRole } from '../middleware/auth'
 import { dokuConfigured } from '../lib/doku'
+import { sendApprovalWhatsApp } from '../lib/whatsapp'
 
 export const registrationRouter = Router()
 
@@ -353,7 +354,41 @@ registrationRouter.patch(
         registrationDecisionEmail(rows[0].email, rows[0].full_name, rows[0].status, rows[0].internal_note ?? undefined),
       ).catch((err: unknown) => console.error('Gagal mengirim email keputusan pendaftaran:', err))
     }
-    res.json(mapRegistration(rows[0]))
+
+    // Saat disetujui: kirim tautan grup WhatsApp ke nomor pendaftar. Kegagalan
+    // pengiriman tidak membatalkan verifikasi; pengurus bisa mengirim ulang.
+    let whatsapp: Awaited<ReturnType<typeof sendApprovalWhatsApp>> | undefined
+    if (rows[0].status === 'diverifikasi' && changed) {
+      whatsapp = await sendApprovalWhatsApp(rows[0].phone ?? '', rows[0].full_name, rows[0].email)
+      if (!whatsapp.sent) {
+        console.error('WhatsApp link grup tidak terkirim:', whatsapp.detail)
+      }
+    }
+
+    res.json({ ...mapRegistration(rows[0]), whatsapp })
+  }),
+)
+
+/**
+ * Mengirim ulang tautan grup WhatsApp ke pendaftar yang sudah diverifikasi.
+ * Dipakai tombol "Kirim ulang WA" ketika pengiriman otomatis gagal.
+ */
+registrationRouter.post(
+  '/:id/whatsapp',
+  requireAuth,
+  requireRole('pengurus'),
+  wrap(async (req, res) => {
+    const { rows } = await query<RegistrationRow>('select * from registrations where id = $1', [
+      req.params.id,
+    ])
+    const reg = rows[0]
+    if (!reg) throw ApiError.notFound('Pendaftaran tidak ditemukan.')
+    if (reg.status !== 'diverifikasi') {
+      throw ApiError.badRequest('Tautan grup hanya dikirim untuk pendaftaran yang sudah diverifikasi.')
+    }
+
+    const result = await sendApprovalWhatsApp(reg.phone ?? '', reg.full_name, reg.email)
+    res.json(result)
   }),
 )
 

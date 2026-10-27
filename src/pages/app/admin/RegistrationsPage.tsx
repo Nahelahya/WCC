@@ -25,6 +25,7 @@ export function RegistrationsPage() {
   const [working, setWorking] = useState(false)
   const [pending, setPending] = useState<RegistrationStatus | null>(null)
   const [paymentBusy, setPaymentBusy] = useState(false)
+  const [waBusy, setWaBusy] = useState(false)
 
   const rows = useMemo(() => {
     let data = list.data ?? []
@@ -43,13 +44,32 @@ export function RegistrationsPage() {
     setWorking(true)
     setPending(next)
     try {
-      await registrationApi.setStatus(r.id, next, note || undefined)
-      toast(
-        next === 'diverifikasi'
-          ? `Pendaftaran ${r.fullName} berhasil diverifikasi.`
-          : `Pendaftaran ${r.fullName} ditolak.`,
-        next === 'diverifikasi' ? 'success' : 'info',
-      )
+      const updated = await registrationApi.setStatus(r.id, next, note || undefined)
+      if (next === 'diverifikasi') {
+        // Server mengirim tautan grup WhatsApp otomatis; beri tahu bila gagal.
+        const wa = updated.whatsapp
+        if (wa?.sent) {
+          toast(
+            `Pendaftaran ${r.fullName} diverifikasi. Link grup WhatsApp sudah dikirim ke ${r.phone}.`,
+            'success',
+          )
+        } else if (wa?.waUrl) {
+          window.open(wa.waUrl, '_blank', 'noopener,noreferrer')
+          toast(
+            `Pendaftaran ${r.fullName} diverifikasi. Fonnte belum aktif, jadi WhatsApp Web dibuka — tekan Send untuk mengirim link grup ke ${r.phone}.`,
+            'info',
+          )
+        } else {
+          toast(
+            `Pendaftaran ${r.fullName} diverifikasi, tetapi WhatsApp belum terkirim: ${
+              wa?.detail ?? 'tidak ada respons dari server'
+            } Gunakan tombol "Kirim ulang WA".`,
+            'warning',
+          )
+        }
+      } else {
+        toast(`Pendaftaran ${r.fullName} ditolak.`, 'info')
+      }
       setDetail(null)
       setNote('')
       list.reload()
@@ -58,6 +78,27 @@ export function RegistrationsPage() {
     } finally {
       setWorking(false)
       setPending(null)
+    }
+  }
+
+  /** Mengirim ulang tautan grup WhatsApp ke pendaftar yang sudah diverifikasi. */
+  async function resendWhatsApp() {
+    if (!detail) return
+    setWaBusy(true)
+    try {
+      const result = await registrationApi.sendWhatsApp(detail.id)
+      if (result.sent) {
+        toast(result.detail, 'success')
+      } else if (result.waUrl) {
+        window.open(result.waUrl, '_blank', 'noopener,noreferrer')
+        toast('WhatsApp Web dibuka dengan pesan siap kirim. Tekan Send untuk mengirim.', 'info')
+      } else {
+        toast(result.detail, 'warning')
+      }
+    } catch (err) {
+      toast(errorMessage(err), 'error')
+    } finally {
+      setWaBusy(false)
     }
   }
 
@@ -203,6 +244,16 @@ export function RegistrationsPage() {
         footer={
           detail ? (
             <>
+              {detail.status === 'diverifikasi' && (
+                <Button
+                  variant="secondary"
+                  loading={waBusy}
+                  disabled={working}
+                  onClick={() => void resendWhatsApp()}
+                >
+                  Kirim ulang WA
+                </Button>
+              )}
               <Button variant="secondary" onClick={() => setDetail(null)} disabled={working}>
                 Tutup
               </Button>
@@ -327,6 +378,13 @@ export function RegistrationsPage() {
               placeholder="Hanya terlihat pengurus. Tidak dikirim ke calon anggota."
             />
 
+            {detail.status === 'diverifikasi' && (
+              <Alert tone="info">
+                Tautan grup WhatsApp otomatis dikirim ke <strong>{detail.phone}</strong> saat verifikasi.
+                Bila anggota belum menerimanya, gunakan tombol <strong>Kirim ulang WA</strong>.
+              </Alert>
+            )}
+
             {locked ? (
               <Alert tone="info">
                 Pendaftaran ini sudah{' '}
@@ -336,7 +394,8 @@ export function RegistrationsPage() {
             ) : (
               <Alert tone="warning">
                 Pastikan data sudah benar. Setelah memilih <strong>Verifikasi</strong> atau <strong>Tolak</strong>,
-                keputusan <strong>tidak dapat diubah</strong> lagi.
+                keputusan <strong>tidak dapat diubah</strong> lagi. Verifikasi akan mengaktifkan akun dan mengirim
+                tautan grup WhatsApp ke <strong>{detail.phone}</strong>.
               </Alert>
             )}
           </div>

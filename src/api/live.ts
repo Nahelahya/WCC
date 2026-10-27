@@ -29,6 +29,7 @@ import type {
   TreasurySummary,
   UpdateUserAccountInput,
   UploadResult,
+  WhatsAppSendResult,
 } from './types'
 
 /**
@@ -379,11 +380,16 @@ export const registrationApi = {
     id: string,
     status: RegistrationStatus,
     internalNote?: string,
-  ): Promise<Registration> {
+  ): Promise<Registration & { whatsapp?: WhatsAppSendResult }> {
     return request(`/registrations/${encodeURIComponent(id)}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status, internalNote }),
     })
+  },
+
+  /** Mengirim ulang tautan grup WhatsApp ke pendaftar yang sudah diverifikasi. */
+  async sendWhatsApp(id: string): Promise<WhatsAppSendResult> {
+    return request(`/registrations/${encodeURIComponent(id)}/whatsapp`, { method: 'POST' })
   },
 
   /** Menandai biaya administrasi sudah lunas (mis. bayar tunai). */
