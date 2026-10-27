@@ -10,6 +10,7 @@ import { CoachCard } from '@/components/cards/CoachCard'
 import { CardSkeleton, EmptyState, ErrorState } from '@/components/ui/Feedback'
 import { todayISO } from '@/lib/date'
 import { StatusBadge } from '@/components/ui/StatusBadge'
+import { ActivityCarousel } from '@/components/public/ActivityCarousel'
 import { getLandingDefaults } from '@/lib/landing-defaults'
 import type { LandingContent } from '@/types.landing'
 
@@ -357,29 +358,7 @@ export function LandingPage() {
               <p className="mt-1.5 max-w-2xl text-sm text-muted">{content.activities.description}</p>
             )}
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {content.activities.items.map((item) => (
-              <figure key={item.id} className="group overflow-hidden rounded-card border border-line bg-surface">
-                {item.imageUrl ? (
-                  <img
-                    src={item.imageUrl}
-                    alt={item.title}
-                    className="aspect-[16/10] w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                  />
-                ) : (
-                  <div className="flex aspect-[16/10] w-full items-center justify-center bg-bg text-xs text-muted">
-                    Belum ada gambar
-                  </div>
-                )}
-                {(item.title || item.description) && (
-                  <figcaption className="space-y-1 p-4">
-                    {item.title && <p className="text-[14.5px] font-semibold text-ink">{item.title}</p>}
-                    {item.description && <p className="text-[13px] text-muted">{item.description}</p>}
-                  </figcaption>
-                )}
-              </figure>
-            ))}
-          </div>
+          <ActivityCarousel items={content.activities.items} />
         </section>
       )}
 
