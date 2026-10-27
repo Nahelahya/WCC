@@ -14,9 +14,46 @@ import type {
   LandingContent,
 } from '@/types.landing'
 import { getLandingDefaults } from '@/lib/landing-defaults'
+import { ACTIVITY_CROP_DEFAULT, activityCropStyle } from '@/lib/imageCrop'
 
 function uid() {
   return Math.random().toString(36).slice(2, 9)
+}
+
+function CropSlider({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  display,
+  onChange,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step?: number
+  display: string
+  onChange: (value: number) => void
+}) {
+  return (
+    <label className="block">
+      <span className="flex items-center justify-between gap-2 text-[11.5px] text-muted">
+        <span>{label}</span>
+        <span className="font-medium text-ink">{display}</span>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="mt-1 w-full accent-primary"
+      />
+    </label>
+  )
 }
 
 export function LandingSettingsPage() {
@@ -102,6 +139,17 @@ export function LandingSettingsPage() {
   function removeActivity(id: string) {
     update((d) => {
       d.activities.items = d.activities.items.filter((x) => x.id !== id)
+    })
+  }
+
+  /** Ubah pengaturan crop/zoom satu foto kegiatan (fokus X, fokus Y, zoom). */
+  function setActivityCrop(
+    id: string,
+    patch: Partial<Pick<LandingActivityItem, 'focusX' | 'focusY' | 'zoom'>>,
+  ) {
+    update((d) => {
+      const item = d.activities.items.find((x) => x.id === id)
+      if (item) Object.assign(item, patch)
     })
   }
 
@@ -391,9 +439,9 @@ export function LandingSettingsPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {draft.activities.items.map((item: LandingActivityItem) => (
                 <div key={item.id} className="flex flex-col overflow-hidden rounded-card border border-line bg-surface">
-                  <div className="relative aspect-[16/10] w-full bg-bg">
+                  <div className="relative aspect-[16/9] w-full overflow-hidden bg-bg">
                     {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
+                      <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" style={activityCropStyle(item)} />
                     ) : (
                       <div className="flex h-full items-center justify-center text-xs text-muted">Belum ada gambar</div>
                     )}
@@ -417,6 +465,52 @@ export function LandingSettingsPage() {
                       Ganti Gambar
                       <input type="file" accept="image/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void uploadImage(f, (url) => update((d) => { const it = d.activities.items.find((x) => x.id === item.id); if (it) it.imageUrl = url })) }} />
                     </label>
+                    <details className="rounded-control border border-line bg-bg/50 px-2.5 py-2">
+                      <summary className="cursor-pointer select-none text-xs font-medium text-ink">
+                        Atur crop &amp; zoom
+                      </summary>
+                      <p className="mt-1 text-[11.5px] leading-snug text-muted">
+                        Geser fokus dan perbesar foto agar bagian penting tidak terpotong di beranda.
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        <CropSlider
+                          label="Geser kiri / kanan"
+                          value={item.focusX ?? ACTIVITY_CROP_DEFAULT.focusX}
+                          min={0}
+                          max={100}
+                          display={`${Math.round(item.focusX ?? ACTIVITY_CROP_DEFAULT.focusX)}%`}
+                          onChange={(v) => setActivityCrop(item.id, { focusX: v })}
+                        />
+                        <CropSlider
+                          label="Geser atas / bawah"
+                          value={item.focusY ?? ACTIVITY_CROP_DEFAULT.focusY}
+                          min={0}
+                          max={100}
+                          display={`${Math.round(item.focusY ?? ACTIVITY_CROP_DEFAULT.focusY)}%`}
+                          onChange={(v) => setActivityCrop(item.id, { focusY: v })}
+                        />
+                        <CropSlider
+                          label="Zoom"
+                          value={item.zoom ?? ACTIVITY_CROP_DEFAULT.zoom}
+                          min={1}
+                          max={3}
+                          step={0.05}
+                          display={`${Math.round((item.zoom ?? ACTIVITY_CROP_DEFAULT.zoom) * 100)}%`}
+                          onChange={(v) => setActivityCrop(item.id, { zoom: v })}
+                        />
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-muted">Pratinjau di atas memakai bingkai 16:9 (sama seperti beranda).</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon="undo"
+                            onClick={() => setActivityCrop(item.id, { ...ACTIVITY_CROP_DEFAULT })}
+                          >
+                            Reset
+                          </Button>
+                        </div>
+                      </div>
+                    </details>
                   </div>
                 </div>
               ))}

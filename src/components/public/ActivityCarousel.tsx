@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { LandingActivityItem } from '@/types.landing'
 import { Icon } from '@/components/ui/Icon'
+import { activityCropStyle } from '@/lib/imageCrop'
 
 interface ActivityCarouselProps {
   items: LandingActivityItem[]
@@ -83,6 +84,7 @@ export function ActivityCarousel({ items, autoPlayMs = 5000 }: ActivityCarouselP
                   src={item.imageUrl}
                   alt={item.title || 'Foto kegiatan'}
                   className="h-full w-full object-cover"
+                  style={activityCropStyle(item)}
                   loading="lazy"
                 />
               ) : (

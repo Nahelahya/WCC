@@ -61,6 +61,12 @@ export interface LandingActivityItem {
   title: string
   description: string
   imageUrl?: string
+  /** Titik fokus horizontal foto (0–100%). Default 50 (tengah). */
+  focusX?: number
+  /** Titik fokus vertikal foto (0–100%). Default 50 (tengah). */
+  focusY?: number
+  /** Perbesaran foto di dalam bingkai (1–3). Default 1. */
+  zoom?: number
 }
 
 export interface LandingActivities {

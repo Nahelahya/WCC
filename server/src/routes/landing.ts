@@ -93,6 +93,9 @@ const activityItemSchema = z.object({
   title: z.string().trim().min(1).max(120),
   description: z.string().trim().max(400),
   imageUrl: z.string().trim().max(2000).optional().or(z.literal('')),
+  focusX: z.number().min(0).max(100).optional(),
+  focusY: z.number().min(0).max(100).optional(),
+  zoom: z.number().min(1).max(3).optional(),
 })
 
 const activitiesSchema = z.object({
