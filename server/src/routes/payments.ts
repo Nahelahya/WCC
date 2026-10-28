@@ -38,6 +38,22 @@ import { mapPayment, type PaymentRow } from '../lib/mappers'
 import { todayISO } from '../lib/time'
 import { env } from '../env'
 
+/** Cek apakah webhook DOKU (oleh Request-Id) sudah diproses sebelumnya. */
+async function isDokuWebhookReplayed(requestId: string): Promise<boolean> {
+  if (!requestId) return false
+  const res = await query<{ id: string }>(
+    'select 1 from doku_webhook_replays where request_id = $1',
+    [requestId],
+  )
+  return (res.rowCount ?? 0) > 0
+}
+
+/** Catat webhook DOKU yang sudah diproses. */
+async function recordProcessedDokuWebhook(requestId: string): Promise<void> {
+  if (!requestId) return
+  await query('insert into doku_webhook_replays (request_id) values ($1)', [requestId])
+}
+
 export const paymentRouter = Router()
 
 const PAYMENT_COLUMNS = `
@@ -565,6 +581,12 @@ paymentRouter.post(
       res.status(400).json({ message: 'Body notifikasi tidak valid.' })
       return
     }
+
+    // Hindari pemrosesan ulang webhook dengan Request-Id yang sama (retry / replay).
+    if (await isDokuWebhookReplayed(headers.requestId)) {
+      return res.json({ ok: true })
+    }
+    await recordProcessedDokuWebhook(headers.requestId)
 
     const invoiceNumber = payload.order?.invoice_number
     if (!invoiceNumber) {

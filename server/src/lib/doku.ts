@@ -218,6 +218,21 @@ export interface DokuNotificationHeaders {
  * `requestTarget` harus sama persis dengan path URL notifikasi yang kita
  * daftarkan (contoh: `/api/payments/doku/notification`).
  */
+const REQUEST_TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000 // ±5 menit
+
+function isoToUnixMs(value: string | undefined): number | null {
+  if (!value) return null
+  const ms = Date.parse(value)
+  return Number.isNaN(ms) ? null : ms
+}
+
+function isTimestampWithinTolerance(requestTimestamp: string | undefined): boolean {
+  const ms = isoToUnixMs(requestTimestamp)
+  if (ms === null) return false
+  const now = Date.now()
+  return Math.abs(now - ms) <= REQUEST_TIMESTAMP_TOLERANCE_MS
+}
+
 export function verifyDokuNotification(
   rawBody: string,
   headers: DokuNotificationHeaders,
@@ -228,6 +243,9 @@ export function verifyDokuNotification(
   // Hanya terima notifikasi yang mengatasnamakan akun DOKU kita.
   if (env.dokuClientId && clientId !== env.dokuClientId) return false
   if (!env.dokuSecretKey) return false
+  // Bandingkan waktu server dengan Request-Timestamp yang dikirim DOKU.
+  // Buffer ±5 menit dari jam server guna mencegah replay.
+  if (!isTimestampWithinTolerance(requestTimestamp)) return false
 
   const expected = `HMACSHA256=${sign(
     clientId,
