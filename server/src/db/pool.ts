@@ -13,6 +13,14 @@ export const pool = new pg.Pool({
   connectionString: normalizeConnectionString(env.databaseUrl),
   max: 10,
   idleTimeoutMillis: 30_000,
+  // Wajib agar tidak ada permintaan yang menunggu koneksi DB selamanya.
+  // - connectionTimeoutMillis: gagal cepat jika PostgreSQL lambat/tidak bisa
+  //   dijangkau, bukan menunggu selamanya (mencegah 504 Gateway Timeout).
+  // - statement_timeout: Hentikan kueri berjalan lebih dari 30 detik, sehingga
+  //   query yang macet tidak membanjiri proxy (nginx) dan memicu 504.
+  connectionTimeoutMillis: 5_000,
+  statement_timeout: 30_000,
+  // Fungsi: biarkan node-postgres meneruskan statement_timeout sebagai ms ke libpq.
 })
 
 export type QueryParams = ReadonlyArray<unknown>
