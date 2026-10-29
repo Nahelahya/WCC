@@ -31,11 +31,10 @@ COPY --from=base /app/server/dist ./server/dist
 COPY --from=base /app/server/package*.json ./server/
 COPY --from=base /app/server/node_modules ./server/node_modules
 COPY --from=base /app/node_modules ./node_modules
-COPY --from=base /app/server/.env ./server/.env
 COPY --from=base /app/server/src/db/migrations ./server/src/db/migrations
-COPY server/src/db/migrations ./server/src/db/migrations
+COPY --from=base /app/server/src/db/migrations ./server/src/db/migrations
 
-# Startup script
+# Start-up script
 COPY start.sh .
 RUN chmod +x start.sh
 

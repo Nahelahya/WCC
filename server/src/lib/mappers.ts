@@ -55,6 +55,22 @@ export function mapUser(row: UserRow) {
   }
 }
 
+/** Serializer non-PII untuk daftar pengguna (M-03): tanpa NIK, alamat,
+ *  riwayat penyakit, kontak orang tua, maupun attendanceToken. */
+export function mapUserPublic(row: UserRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    phone: row.phone ?? undefined,
+    photoUrl: row.photo_url ?? undefined,
+    joinedAt: row.joined_at,
+    membershipStatus: row.membership_status ?? undefined,
+    coachId: row.coach_id ?? undefined,
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Coaches                                                             */
 /* ------------------------------------------------------------------ */
@@ -239,7 +255,25 @@ export function mapRegistration(row: RegistrationRow) {
       : undefined,
     paymentMethod: (row.payment_method as 'cash' | 'gateway' | null) ?? undefined,
     paymentStatus: row.payment_status === 'lunas' ? 'lunas' : 'belum',
-  }
+  };
+}
+
+/** Ringkuman publik minimal untuk `GET /api/registrations/status` (H-01).
+ *  Hanya `id`, `fullName`, `email`, `status`, `submittedAt`, `paymentStatus`.
+ *  NIK, alamat, riwayat penyakit, dan data orang tua TIDAK pernah dibuang dari
+ *  endpoint ini, sehingga tidak mengandung data pribadi yang tidak perlu. */
+export function mapRegistrationPublic(row: RegistrationRow) {
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    email: row.email,
+    status: row.status,
+    submittedAt:
+      row.submitted_at instanceof Date
+        ? row.submitted_at.toISOString()
+        : String(row.submitted_at),
+    paymentStatus: row.payment_status === 'lunas' ? 'lunas' : 'belum',
+  };
 }
 
 /* ------------------------------------------------------------------ */

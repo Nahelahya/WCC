@@ -131,6 +131,13 @@ export function mailerStatus(): string {
     : 'mode log (email belum dikonfigurasi)'
 }
 
+/** Mensimetrikasi alamat email sehingga bagian lokal tidak tercetak di log. */
+function maskEmail(to: string): string {
+  const [local, domain] = to.split('@')
+  if (!domain) return `${local?.slice(0, 2)}***@***`
+  return `${local?.slice(0, 2)}***@${domain}`
+}
+
 /** Mengirim email. Bila belum dikonfigurasi, isi email ditulis ke log. */
 export async function sendMail(message: MailMessage): Promise<void> {
   if (isMailApiConfigured()) {
@@ -140,15 +147,12 @@ export async function sendMail(message: MailMessage): Promise<void> {
 
   const tx = getTransporter()
   if (!tx) {
-    console.log('\n──────── EMAIL (mode log — email belum dikonfigurasi) ────────')
-    console.log(`  Kepada : ${message.to}`)
+    // Mode log: jangan mencatat isi email (termasuk OTP) ke log. Mencegah
+    // kebocoran kode otentikasi saat SMTP/SMTP belum dikonfigurasi.
+    console.log(`\n[EMAIL mode log — email belum dikonfigurasi]`)
+    console.log(`  Kepada : ${maskEmail(message.to)}`)
     console.log(`  Subjek : ${message.subject}`)
-    console.log(
-      message.text
-        .split('\n')
-        .map((line) => `  ${line}`)
-        .join('\n'),
-    )
+    console.log('  Isi pesan disembunyikan - jangan dicatat di log.')
     console.log('────────────────────────────────────────────────────────────\n')
     return
   }

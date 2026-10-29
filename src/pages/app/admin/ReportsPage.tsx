@@ -96,6 +96,15 @@ export function ReportsPage() {
     toast('Laporan kas berhasil diekspor ke CSV.', 'success')
   }
 
+  function escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+  }
+
   function exportPdf() {
     if (rows.length === 0) {
       toast('Tidak ada data pada periode ini untuk diekspor.', 'warning')
@@ -111,10 +120,10 @@ export function ReportsPage() {
         (t) => `<tr>
           <td>${formatDateID(t.date)}</td>
           <td>${t.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}</td>
-          <td>${t.category}</td>
+          <td>${escapeHtml(t.category)}</td>
           <td class="r">${formatRupiah(t.amount)}</td>
-          <td>${t.note || '-'}</td>
-          <td>${t.recordedBy}</td>
+          <td>${escapeHtml(t.note || '-')}</td>
+          <td>${escapeHtml(t.recordedBy)}</td>
         </tr>`,
       )
       .join('')

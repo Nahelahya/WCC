@@ -31,6 +31,15 @@ const sessionFields = z.object({
   cancelled: z.boolean().optional(),
 })
 
+/** Mengembalikan `coach_id` pengguna, atau `null` bila pengguna bukan coach. */
+async function coachIdOf(userId: string): Promise<string | null> {
+  const { rows } = await query<{ coach_id: string | null }>(
+    'select coach_id from users where id = $1',
+    [userId],
+  )
+  return rows[0]?.coach_id ?? null
+}
+
 /* ---------------------- Daftar & detail jadwal ---------------------- */
 
 sessionRouter.get(
@@ -62,6 +71,17 @@ sessionRouter.post(
     const input = sessionFields.parse(req.body ?? {})
     if (input.endTime <= input.startTime) {
       throw ApiError.badRequest('Waktu selesai harus setelah waktu mulai.')
+    }
+
+    // Coach hanya boleh membuat sesi atas coach yang diampu.
+    if (req.auth!.role === 'coach') {
+      const { rows: me } = await query<{ coach_id: string | null }>(
+        'select coach_id from users where id = $1',
+        [req.auth!.userId],
+      )
+      if (!me[0]?.coach_id || me[0].coach_id !== input.coachId) {
+        throw ApiError.forbidden('Anda hanya dapat membuat sesi atas coach yang Anda ampu.')
+      }
     }
     const id = newId('s')
     const { rows } = await query<SessionRow>(
@@ -95,6 +115,11 @@ sessionRouter.patch(
     ])
     const current = existing[0]
     if (!current) throw ApiError.notFound('Sesi tidak ditemukan.')
+
+    // Coach hanya boleh mengubah sesi yang diampu.
+    if (req.auth!.role === 'coach' && current.coach_id !== (await coachIdOf(req.auth!.userId))) {
+      throw ApiError.forbidden('Anda hanya dapat mengubah sesi yang Anda ampu.')
+    }
 
     const merged = {
       title: patch.title ?? current.title,
@@ -138,6 +163,17 @@ sessionRouter.delete(
   requireAuth,
   requireRole('pengurus', 'coach'),
   wrap(async (req, res) => {
+    const { rows: existing } = await query<SessionRow>('select * from sessions where id = $1', [
+      req.params.id,
+    ])
+    const current = existing[0]
+    if (!current) throw ApiError.notFound('Sesi tidak ditemukan.')
+
+    // Coach hanya boleh menghapus sesi yang diampu.
+    if (req.auth!.role === 'coach' && current.coach_id !== (await coachIdOf(req.auth!.userId))) {
+      throw ApiError.forbidden('Anda hanya dapat menghapus sesi yang Anda ampu.')
+    }
+
     const { rowCount } = await query('delete from sessions where id = $1', [req.params.id])
     if (!rowCount) throw ApiError.notFound('Sesi tidak ditemukan.')
     res.json({ ok: true })

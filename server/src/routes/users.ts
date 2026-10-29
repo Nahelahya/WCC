@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { query } from '../db/pool'
 import { ApiError } from '../lib/errors'
 import { wrap } from '../lib/async'
-import { mapUser, type UserRow } from '../lib/mappers'
+import { mapUser, mapUserPublic, type UserRow } from '../lib/mappers'
 import { hashPassword, verifyPassword } from '../lib/password'
 import { newId } from '../lib/ids'
 import { randomUUID } from 'node:crypto'
@@ -31,11 +31,28 @@ userRouter.get(
   '/',
   requireRole('pengurus', 'coach'),
   wrap(async (req, res) => {
-    const role = typeof req.query.role === 'string' && ROLES.includes(req.query.role as Role)
+    const requestedRole = typeof req.query.role === 'string' && ROLES.includes(req.query.role as Role)
       ? (req.query.role as Role)
       : 'anggota'
-    const { rows } = await query<UserRow>('select * from users where role = $1 order by name asc', [role])
-    res.json(rows.map(mapUser))
+    const actor = req.auth!.role
+
+    // Coach hanya akan melihat anggota yang diampu, dan tidak boleh melihat
+    // daftar 'pengurus'. Semua respon daftar memakai serializer non-PII
+    // (M-03): tanpa NIK/alamat/riwayat penyakit/kontak orang tua/attendanceToken.
+    if (actor === 'coach') {
+      if (requestedRole === 'pengurus') return res.json({ users: [] })
+      const { rows } = await query<UserRow>(
+        `select u.* from users u where u.role = $1 and u.coach_id = $2 order by u.name asc`,
+        [requestedRole, req.auth!.userId],
+      )
+      return res.json(rows.map(mapUserPublic))
+    }
+
+    const { rows } = await query<UserRow>(
+      `select * from users where role = $1 order by name asc`,
+      [requestedRole],
+    )
+    res.json(rows.map(mapUserPublic))
   }),
 )
 

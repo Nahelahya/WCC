@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import { randomBytes } from 'node:crypto'
 
 function required(name: string, fallback?: string): string {
   const value = process.env[name] ?? fallback
@@ -84,9 +85,10 @@ export const env = {
   // 0 = NONAKTIF untuk API umum & reset password. Khusus login, proteksi
   // selalu aktif dengan default 5 percobaan gagal / 15 menit bila 0/kosong.
   rateLimitWindowMinutes: Number(process.env.RATE_LIMIT_WINDOW_MINUTES ?? 15),
-  apiRateLimit: Number(process.env.API_RATE_LIMIT ?? 0),
+  apiRateLimit: Number(process.env.API_RATE_LIMIT ?? 120),
+  /** >0 = aktif. Default 10 permintaan / menit per IP pada /forgot-password. */
+  passwordResetRateLimit: Number(process.env.PASSWORD_RESET_RATE_LIMIT ?? 10),
   loginRateLimit: Number(process.env.LOGIN_RATE_LIMIT ?? 5),
-  passwordResetRateLimit: Number(process.env.PASSWORD_RESET_RATE_LIMIT ?? 0),
 
   // ---- Google Sheets (poin 3) ----
   googleSheetsId: process.env.GOOGLE_SHEETS_ID ?? '',
@@ -114,5 +116,15 @@ export const env = {
   sheetsRequestTimeoutMs: Number(process.env.SHEETS_REQUEST_TIMEOUT_MS ?? 15000),
 }
 
-/** Password awal untuk seluruh akun demo (hanya dipakai oleh skrip seed). */
-export const DEMO_PASSWORD = 'wcc12345'
+// Gagal tertutup (M-09): JWT_SECRET wajib acak, panjang ≥32, dan bukan
+// placeholder / huruf umum. Mencegah JWT palsu dipakai di produksi.
+const jwtSecretRaw = process.env.JWT_SECRET ?? ''
+if (/(placeholder|ganti|default)/i.test(jwtSecretRaw) || jwtSecretRaw.length < 32) {
+  throw new Error(
+    'JWT_SECRET tidak valid: beri string acak minimal 32 karakter (jangan pakai placeholder/ganti).',
+  )
+}
+
+/** Password awal akun demo (hanya dipakai skrip seed). Bila belum diisi,
+ *  di-generate acak 16 karakter. JANGAN ditulis ke source/git/PROD. */
+export const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? randomBytes(12).toString('base64url')

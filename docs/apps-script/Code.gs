@@ -1,5 +1,4 @@
-/**
- * WISANGGENI CLIMBING CLUB — Sinkronisasi Kas ke Google Sheets
+/** WISANGGENI CLIMBING CLUB — Sinkronisasi Kas ke Google Sheets
  * ------------------------------------------------------------------
  * Web App ini menjadi jembatan antara server aplikasi dan spreadsheet ini,
  * sehingga TIDAK perlu Service Account / Google Cloud Console.
@@ -10,20 +9,32 @@
  *   3. Hapus isi editor, tempel SELURUH kode di bawah, lalu simpan (Ctrl+S).
  *   4. Klik  Deploy → New deployment → ikon gear → "Web app".
  *   5. Isi:  Description    = bebas (mis. "WCC kas sync").
- *            Execute as     = Me (akun kamu).
- *            Who has access = Anyone.
- *   6. Klik Deploy → izinkan akses
- *      (Review permissions → Advanced → Go to … (unsafe) → Allow).
- *   7. Salin "Web app URL" (berakhiran /exec), lalu kirim ke pengelola server
- *      untuk diisi sebagai GOOGLE_APPS_SCRIPT_URL.
+ *          Execute as     = Me (akun kamu).
+ *          Who has access = Appsscript (lebih aman daripada "Anyone").
+ *   6. Klik Deploy → izin akses (RESTRICTED jika memungkinkan).
+ *   7. Salin "Web app URL" (berakhiran /exec), lalu kirim ke pengelola
+ *      server untuk diisi sebagai GOOGLE_APPS_SCRIPT_URL.
  *
- * KEAMANAN: SECRET di bawah adalah "kata sandi bersama". Nilai yang SAMA harus
- * diisi di server sebagai GOOGLE_APPS_SCRIPT_TOKEN. Bila SECRET dibiarkan
- * kosong, endpoint tidak memeriksa token (tidak disarankan).
+ * KEAMANAN:
+ *   - Rahasia bersama dibaca dari Script Properties (kunci "WCC_SECRET"),
+ *     BUKAN dari kode. Jangan pernah menerbitkan SECRET di repositori.
+ *   - `doPost` gagal tertutup: tolak permintaan bila SECRET masih kosong,
+ *     placeholder, atau kurang dari 32 karakter.
+ *   - Pastikan `Execute as` = Me dan `Who has access` = Appsscript (bukan
+ *     "Anyone"), agar hanya aplikasi server yang memanggil endpoint ini.
  */
 
-var SECRET = 'GANTI-DENGAN-TOKEN-RAHASIA';
-var DEFAULT_TAB = 'Kas';
+/** Membaca kunci rahasia dari Script Properties (tidak ada di kode). */
+function getSecret() {
+  return PropertiesService.getScriptProperties().getProperty('WCC_SECRET');
+}
+
+/** Mengecek apakah rahasia sudah kuat dan valid. */
+function isStrongSecret(secret) {
+  if (!secret) return false;
+  if (secret === 'GANTI-DENGAN-TOKEN-RAHASIA') return false;
+  return secret.length >= 32;
+}
 
 function doPost(e) {
   try {
@@ -32,7 +43,17 @@ function doPost(e) {
       body = JSON.parse(e.postData.contents);
     }
 
-    if (SECRET && body.token !== SECRET) {
+    // Gagal tertutup (M-08): tolak permintaan bila rahasia belum disiapkan.
+    var secret = getSecret();
+    if (!isStrongSecret(secret)) {
+      return reply({
+        ok: false,
+        error: 'Konfigurasi rahasia belum siap. Masukkan kunci "WCC_SECRET" (min. 32 karakter) di Script Properties, lalu coba lagi.',
+      });
+    }
+
+    // Lalu lanjutkan verifikasi token.
+    if (body.token !== secret) {
       return reply({ ok: false, error: 'Token tidak valid.' });
     }
 

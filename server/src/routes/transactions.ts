@@ -123,7 +123,7 @@ transactionRouter.post(
   requireRole('pengurus', 'coach'),
   wrap(async (req, res) => {
     const input = transactionSchema.parse(req.body ?? {})
-    const recordedBy = input.recordedBy ?? (await currentUserName(req.auth!.userId))
+    const recordedBy = await currentUserName(req.auth!.userId)
     const { rows } = await query<TransactionRow>(
       `insert into transactions (id, date, type, category, amount, note, recorded_by, receipt_name, receipt_url, created_at)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())

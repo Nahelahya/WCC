@@ -70,7 +70,27 @@ export function createApp() {
   })
 
   // Berkas unggahan (bukti transaksi, foto coach) disajikan sebagai statis.
-  app.use('/uploads', express.static(uploadDir()))
+  // H-02 + M-06: non-gambar (mis. PDF bukti) diatur sebagai lampiran/attachment
+  // agar tidak punya pratinjau inline; semua file mendapat
+  // `X-Content-Type-Options: nosniff` (dari helmet) supaya tidak ada MIME
+  // sniffing yang memicu XSS.
+  app.use(
+    '/uploads',
+    express.static(uploadDir(), {
+      setHeaders(res, _filePath, _stat) {
+        const name = path.basename(_filePath).toLowerCase()
+        const isImage = /\.(png|jpe?g|webp|gif)$/i.test(name)
+        if (!isImage) {
+          res.setHeader('Content-Type', 'application/octet-stream')
+          res.setHeader(
+            'Content-Disposition',
+            `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(_filePath))}`,
+          )
+        }
+        res.setHeader('Cache-Control', 'private, max-age=300')
+      },
+    }),
+  )
 
   app.use('/api/auth', authRouter)
   app.use('/api/users', userRouter)

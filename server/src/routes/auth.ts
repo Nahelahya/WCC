@@ -10,6 +10,7 @@ import { verifyPassword, hashPassword } from '../lib/password'
 import { createRefreshToken, hashToken, refreshTokenExpiry, signAccessToken } from '../lib/tokens'
 import { sendMail } from '../lib/mailer'
 import { passwordResetOtpEmail } from '../lib/emails'
+import { verifyOtp } from '../lib/otp'
 import { generateOtp, hashOtp } from '../lib/otp'
 import { newId } from '../lib/ids'
 import {
@@ -21,11 +22,9 @@ import {
   setRefreshCookie,
 } from '../middleware/auth'
 
-/**
- * Membuat middleware pembatas laju. Bila `limit` <= 0 (default di .env),
- * pembatasan dimatikan sehingga tidak ada blokir sementara untuk pemakaian
- * normal. Isi nilainya > 0 di .env untuk mengaktifkan kembali.
- */
+/** Membatasi laju permintaan. Bila `limit` <= 0 (default di .env), pembatasan
+ *  dimatikan sehingga tidak ada blokir sementara untuk pemakaian normal.
+ *  Isi nilainya > 0 di .env untuk mengaktifkan kembali. */
 function maybeRateLimit(
   limit: number,
   message: string,
@@ -69,10 +68,8 @@ const loginSchema = z.object({
 
 export const authRouter = Router()
 
-/**
- * Menukar refresh token (cookie) dengan access token baru.
- * Refresh token lama langsung dicabut (rotasi) agar tidak bisa dipakai ulang.
- */
+/** Menukar refresh token (cookie) dengan access token baru. Refresh token lama
+ *  langsung dicabut (rotasi) agar tidak bisa dipakai ulang. */
 async function refreshSession(req: Request, res: Response) {
   const token = req.cookies?.[REFRESH_COOKIE] as string | undefined
   if (!token) return null
@@ -80,7 +77,7 @@ async function refreshSession(req: Request, res: Response) {
   const { rows } = await query<
     UserRow & { rt_id: string; expires_at: Date; revoked_at: Date | null }
   >(
-    `select rt.id as rt_id, rt.expires_at, rt.revoked_at, u.*
+    `select rt.id as rt_id, rt.expires_at, rt.revoked_at, u.* 
      from refresh_tokens rt
      join users u on u.id = rt.user_id
      where rt.token_hash = $1
@@ -111,9 +108,10 @@ authRouter.post(
   wrap(async (req, res) => {
     const { email, password } = loginSchema.parse(req.body ?? {})
 
-    const { rows } = await query<UserRow>('select * from users where lower(email) = lower($1) limit 1', [
-      email.trim(),
-    ])
+    const { rows } = await query<UserRow>(
+      'select * from users where lower(email) = lower($1) limit 1',
+      [email.trim()],
+    )
     const row = rows[0]
 
     // Password dibandingkan dengan hash bcrypt. Pesan error disamakan untuk
@@ -209,30 +207,10 @@ authRouter.post(
       })
       .parse(req.body ?? {})
 
-    const h = hashOtp(otp)
-    const { rows } = await query<{
-      id: string
-      used_at: Date | null
-      verified_at: Date | null
-      expires_at: Date
-      tries: number
-      max_tries: number
-    }>(
-      `select id, used_at, verified_at, expires_at, tries, max_tries
-       from otp_codes
-       where lower(email) = lower($1) and purpose = $2 and otp_hash = $3
-       order by created_at desc limit 1`,
-      [email, purpose, h],
-    )
+    // Validasi aman (M-01): counter `tries` hanya naik saat GAGAL, dan
+    // perbandingan kode dilakukan di aplikasi.
+    await verifyOtp(email, purpose, otp)
 
-    const c = rows[0]
-    if (!c) throw ApiError.badRequest('Kode OTP tidak valid.')
-    if (c.used_at) throw ApiError.badRequest('Kode OTP sudah digunakan.')
-    if (c.verified_at) throw ApiError.badRequest('Kode OTP sudah diverifikasi sebelumnya.')
-    if (new Date(c.expires_at).getTime() < Date.now()) throw ApiError.badRequest('Kode OTP sudah kedaluwarsa.')
-    if (c.tries >= c.max_tries) throw ApiError.badRequest('Percobaan OTP melebihi batas. Minta kode baru.')
-
-    await query('update otp_codes set verified_at = now(), tries = tries + 1 where id = $1', [c.id])
     res.json({ verified: true, purpose })
   }),
 )
@@ -263,8 +241,8 @@ authRouter.post(
     if (new Date(c.expires_at).getTime() < Date.now()) throw ApiError.badRequest('Kode OTP sudah kedaluwarsa.')
     if (c.tries >= c.max_tries) throw ApiError.badRequest('Percobaan OTP melebihi batas. Minta kode baru.')
 
-    // Tandai sebagai terpakai
-    await query('update otp_codes set used_at = now(), tries = tries + 1 where id = $1', [c.id])
+    // Tandai sebagai terpakai (tamplok sukses — jangan naikkan `tries`).
+    await query('update otp_codes set used_at = now() where id = $1', [c.id])
 
     await query('update users set password_hash = $2, updated_at = now() where id = $1', [
       c.user_id,

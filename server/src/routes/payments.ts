@@ -583,10 +583,10 @@ paymentRouter.post(
     }
 
     // Hindari pemrosesan ulang webhook dengan Request-Id yang sama (retry / replay).
-    if (await isDokuWebhookReplayed(headers.requestId)) {
+    if (await isDokuWebhookReplayed(headers.requestId ?? '')) {
       return res.json({ ok: true })
     }
-    await recordProcessedDokuWebhook(headers.requestId)
+    await recordProcessedDokuWebhook(headers.requestId ?? '')
 
     const invoiceNumber = payload.order?.invoice_number
     if (!invoiceNumber) {
@@ -602,6 +602,22 @@ paymentRouter.post(
     if (!payment) {
       // Balas 200 agar DOKU tidak mengulang terus untuk invoice yang tak dikenal.
       console.warn(`Notifikasi DOKU untuk invoice tak dikenal: ${invoiceNumber}`)
+      res.json({ ok: true })
+      return
+    }
+
+    // M-10: wajibkan nominal webhook cocok dengan tagihan. Jika tidak cocok,
+    // jangan tandai "paid" sehingga ledger kas tidak keliru.
+    const incomingAmount = Number((payload.order?.amount ?? 0).toString())
+    if (!Number.isFinite(incomingAmount) || incomingAmount !== Number(payment.amount)) {
+      console.warn(
+        `[M-10] amount mismatch Invoice=${invoiceNumber}: DB=${payment.amount}, webhook=${incomingAmount}`,
+      )
+      await query(
+        `update payments set status = 'failed', notification = $1, updated_at = now()
+         where id = $2 and status = 'pending'`,
+        [JSON.stringify(payload), payment.id],
+      )
       res.json({ ok: true })
       return
     }
@@ -870,7 +886,7 @@ paymentRouter.put(
     })
 
     await writeAudit({
-      userId: input.userId,
+      userId: req.auth!.userId,
       action: amount > 0 ? 'update' : 'delete',
       entity: 'payment',
       entityId: `${input.userId}:${input.period}`,

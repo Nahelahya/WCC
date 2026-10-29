@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { query } from '../db/pool'
 import { ApiError } from '../lib/errors'
 import { wrap } from '../lib/async'
-import { mapRegistration, type RegistrationRow } from '../lib/mappers'
+import { mapRegistration, mapRegistrationPublic, type RegistrationRow } from '../lib/mappers'
 import { newId } from '../lib/ids'
 import { hashPassword } from '../lib/password'
 import { sendMail } from '../lib/mailer'
@@ -225,13 +225,9 @@ registrationRouter.get(
       [email],
     )
     // Data lengkap milik pemohon sendiri, TANPA catatan internal pengurus.
-    res.json(
-      rows.map((row) => {
-        const mapped = mapRegistration(row)
-        delete mapped.internalNote
-        return mapped
-      }),
-    )
+    // Publik: HANYA field minimal (H-01). NIK, alamat, riwayat penyakit,
+    // dan data orang tua TIDAK pernah dibuang dari endpoint ini.
+    res.json(rows.map((row) => mapRegistrationPublic(row)))
   }),
 )
 
@@ -345,7 +341,16 @@ registrationRouter.patch(
     // Saat diverifikasi: buat akun anggota otomatis memakai password yang
     // dipilih calon anggota saat mendaftar, agar bisa langsung masuk (login).
     if (rows[0].status === 'diverifikasi' && changed) {
-      await provisionMemberAccount(rows[0])
+      // M-11/H-11: WAJIB email_verified_at sebelum akun anggota dibuat.
+      // Pendaftar yang belum verifikasi email tidak otomatis mendapat akun.
+      if (rows[0].email_verified_at) {
+        await provisionMemberAccount(rows[0]);
+      } else {
+        console.warn(
+          `[M-11] Disetujui tanpa email_verified_at (id=${rows[0].id}); ` +
+            'akun anggota tidak dibuat otomatis. Pengurus dapat membuat manual.',
+        );
+      }
     }
 
     // Kirim email keputusan hanya bila status benar-benar berubah ke hasil final.

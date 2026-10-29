@@ -1,0 +1,19 @@
+# File rahasia / yang tidak perlu dikirim ke image Docker.
+.env
+server/.env
+.git
+.gitignore
+npm-debug.log*
+yarn-debug.log*
+.pnpm-debug.log*
+node_modules
+uploads
+dist
+*.log
+
+# File lokal / config pengembang.
+.env.local
+.env.*.local
+server/src/db/seed.ts
+server/src/db/seed-production.ts
+.DS_Store

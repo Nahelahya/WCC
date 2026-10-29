@@ -21,6 +21,52 @@ const MAGIC_SIGNATURES: Array<{ mime: string; sig: Buffer }> = [
   { mime: 'application/pdf', sig: Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2D]) }, // %PDF-
 ]
 
+/** Ekstensi yang diijinkan berdasarkan isi (MIME) yang terdeteksi. Nama
+ *  berkas KEMUDIAN selalu diambil dari tulang punggung ini, bukan dari
+ *  `originalname` pengguna, untuk menutup celah `.html`/`.svg`/`.js`. */
+const EXT_FROM_MIME: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'application/pdf': '.pdf',
+}
+
+/** Ekstensi yang bermasalah (Active Content). Ditolak sepanjang nama asli.
+ *  Cover HTML/SVG/JS + server-side script + config injection. */
+const ACTIVE_EXTENSIONS = new Set([
+  '.html',
+  '.htm',
+  '.xhtml',
+  '.svg',
+  '.js',
+  '.mjs',
+  '.cjs',
+  '.xml',
+  '.xsl',
+  '.xslt',
+  '.htaccess',
+  '.ini',
+  '.env',
+  '.php',
+  '.phar',
+  '.py',
+  '.sh',
+  '.asp',
+  '.aspx',
+  '.jsp',
+  '.jspx',
+  '.pl',
+  '.rb',
+  '.exe',
+  '.dll',
+  '.so',
+  '.bak',
+  '.zip',
+  '.gz',
+  '.tgz',
+])
+
 function detectMime(buffer: Buffer): string | null {
   for (const { mime, sig } of MAGIC_SIGNATURES) {
     if (buffer.length < sig.length) continue
@@ -38,6 +84,11 @@ function detectMime(buffer: Buffer): string | null {
 
 function isAllowedMime(mime: string): boolean {
   return ALLOWED_MIME.has(mime)
+}
+
+/** File dengan nama akhir yang berisi ekstensi aktif ditolak (H-02). */
+function isUnsafeExtension(name: string): boolean {
+  return ACTIVE_EXTENSIONS.has(extname(name).toLowerCase())
 }
 
 function readStream(stream: NodeJS.ReadableStream): Promise<Buffer> {
@@ -61,14 +112,21 @@ export function publicUrl(filename: string): string {
 /** Middleware unggah satu berkas pada field `file`. */
 export const uploadSingle = multer({
   storage: {
-    async _handleFile(req, file, callback) {
+    async _handleFile(_req, file, callback) {
       const buffer = await readStream(file.stream)
       const detected = detectMime(buffer)
       if (!detected || !isAllowedMime(detected)) {
         callback(new ApiError(400, 'Isi berkas tidak sesuai jenisnya. Gunakan PNG, JPG, WebP, atau PDF.'))
         return
       }
-      const safeExt = extname(file.originalname).toLowerCase().replace(/[^.a-z0-9]/g, '').slice(0, 8)
+      // H-02: ekstensi disimpan selalu dari MIME terdeteksi, bukan dari
+      // `originalname` klien, sehingga `.html`/`.svg`/`.js` dengan header
+      // palsu tidak bisa disimpan sebagai ekstensi aktif.
+      const safeExt = EXT_FROM_MIME[detected] ?? '.bin'
+      if (file.originalname && isUnsafeExtension(file.originalname)) {
+        callback(new ApiError(400, 'Ekstensi berkas tidak diizinkan (HTML/SVG/JS dan sejenis tidak diperbolehkan).'))
+        return
+      }
       const filename = `${Date.now().toString(36)}-${randomBytes(6).toString('hex')}${safeExt}`
       const dir = uploadDir()
       mkdirSync(dir, { recursive: true })
@@ -76,14 +134,14 @@ export const uploadSingle = multer({
       callback(null, { filename, mimetype: detected })
     },
 
-    _removeFile(req, file, callback) {
+    _removeFile(_req, file, callback) {
       try {
         const filepath = join(uploadDir(), file.filename)
         if (existsSync(filepath)) unlinkSync(filepath)
       } catch {
         // ignore
       } finally {
-        callback?.()
+        callback(null)
       }
     },
   },
