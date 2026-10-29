@@ -1,0 +1,33 @@
+[Unit]
+Description=SSH tunnel ke OpenCode homeserver (127.0.0.1:4096)
+Documentation=file:///home/hermes/wcc-handoff/docs/handoff-hermes-ubuntu.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+Environment=HOME=/home/hermes
+
+# Ganti wcc@HOMESERVER dengan user@host yang sebenarnya.
+# Kunci ini hanya boleh bisa login sebagai user wcc di homeserver.
+ExecStart=/usr/bin/ssh -NT \
+  -o BatchMode=yes \
+  -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -o IdentitiesOnly=yes \
+  -i /home/hermes/.ssh/id_ed25519_wcc \
+  -L 127.0.0.1:4096:127.0.0.1:4096 \
+  wcc@HOMESERVER
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/hermes/.ssh
+
+[Install]
+WantedBy=multi-user.target

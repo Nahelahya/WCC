@@ -1,0 +1,354 @@
+#!/usr/bin/env bash
+# wcc-task - kirim satu tugas JSON ke OpenCode di homeserver lewat SSH.
+#
+# Pemakaian:
+#   wcc-task /etc/wcc/tasks/WCC-2026-10-29-001.json
+#   wcc-task --dry-run task.json
+#
+# Keluaran: satu objek JSON di stdout. Log manusia ada di stderr.
+# Rahasia tidak pernah ditulis ke stdout, log, atau command line.
+
+set -euo pipefail
+
+PROG="$(basename -- "$0")"
+
+readonly EXIT_OK=0
+readonly EXIT_USAGE=2
+readonly EXIT_PREFLIGHT=3
+readonly EXIT_RUN=4
+
+log() {
+  printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" >&2
+}
+
+die() {
+  local code="$1"
+  shift
+  log "GAGAL: $*"
+  exit "$code"
+}
+
+usage() {
+  cat <<EOF
+Pakai: $PROG [opsi] <task.json>
+
+Opsi:
+  --dry-run          validasi tugas, cetak prompt, jangan hubungi homeserver
+  --skip-preflight   lewati pemeriksaan repo bersih (hanya untuk keadaan darurat)
+  -h, --help         tampilkan bantuan ini
+
+Variabel lingkungan (biasanya dari /etc/wcc/hermes.env):
+  WCC_SSH_HOST       tujuan SSH              (default: wcc@homeserver)
+  WCC_SSH_KEY        kunci privat SSH        (default: agen ssh / ~/.ssh)
+  WCC_REPO_DIR       repo di homeserver      (default: /home/wcc/apps/WCC)
+  WCC_LOG_DIR        direktori log NDJSON    (default: ~/.local/state/wcc/logs)
+  WCC_TASK_TIMEOUT   batas waktu detik       (default: 3600)
+
+Kode keluar:
+  0 sukses        2 usage/konfigurasi
+  3 preflight     4 agen gagal / meninggalkan perubahan belum di-commit
+EOF
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "$EXIT_USAGE" "perintah '$1' tidak ditemukan"
+}
+
+# --- argumen -------------------------------------------------------------
+
+TASK_FILE=""
+DRY_RUN=0
+SKIP_PREFLIGHT=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit "$EXIT_OK"
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      ;;
+    --skip-preflight)
+      SKIP_PREFLIGHT=1
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      die "$EXIT_USAGE" "opsi tidak dikenal: $1"
+      ;;
+    *)
+      [ -z "$TASK_FILE" ] || die "$EXIT_USAGE" "hanya satu task.json yang diterima"
+      TASK_FILE="$1"
+      ;;
+  esac
+  shift
+done
+
+if [ -z "$TASK_FILE" ] && [ "$#" -gt 0 ]; then
+  TASK_FILE="$1"
+fi
+
+[ -n "$TASK_FILE" ] || die "$EXIT_USAGE" "task.json wajib diisi (lihat --help)"
+[ -f "$TASK_FILE" ] || die "$EXIT_USAGE" "file tugas tidak ada: $TASK_FILE"
+
+require_cmd jq
+require_cmd base64
+require_cmd ssh
+
+# --- konfigurasi ---------------------------------------------------------
+
+SSH_HOST="${WCC_SSH_HOST:-wcc@homeserver}"
+SSH_KEY="${WCC_SSH_KEY:-}"
+REPO_DIR="${WCC_REPO_DIR:-/home/wcc/apps/WCC}"
+LOG_DIR="${WCC_LOG_DIR:-$HOME/.local/state/wcc/logs}"
+TASK_TIMEOUT="${WCC_TASK_TIMEOUT:-3600}"
+
+case "$TASK_TIMEOUT" in
+  ''|*[!0-9]*) die "$EXIT_USAGE" "WCC_TASK_TIMEOUT harus angka detik" ;;
+esac
+
+SSH_OPTS=(
+  -o BatchMode=yes
+  -o ConnectTimeout=15
+  -o ServerAliveInterval=30
+  -o ServerAliveCountMax=4
+)
+if [ -n "$SSH_KEY" ]; then
+  SSH_OPTS+=(-i "$SSH_KEY")
+fi
+
+# --- validasi tugas ------------------------------------------------------
+
+jq -e . "$TASK_FILE" >/dev/null 2>&1 || die "$EXIT_USAGE" "JSON tidak valid: $TASK_FILE"
+
+GOAL="$(jq -r '.goal // empty' "$TASK_FILE")"
+[ -n "$GOAL" ] || die "$EXIT_USAGE" ".goal wajib diisi"
+
+TASK_ID="$(jq -r '.id // empty' "$TASK_FILE")"
+if [ -z "$TASK_ID" ]; then
+  TASK_ID="wcc-$(date -u +%Y%m%dT%H%M%SZ)"
+fi
+case "$TASK_ID" in
+  *[!A-Za-z0-9._-]*) die "$EXIT_USAGE" ".id hanya boleh huruf, angka, titik, garis bawah, strip" ;;
+esac
+
+BRANCH="$(jq -r '.branch // "testing"' "$TASK_FILE")"
+AGENT="$(jq -r '.agent // "wcc"' "$TASK_FILE")"
+DIR="$(jq -r --arg d "$REPO_DIR" '.directory // $d' "$TASK_FILE")"
+CHECKOUT="$(jq -r '.checkout // false' "$TASK_FILE")"
+
+case "$BRANCH" in
+  ''|*[!A-Za-z0-9._/-]*) die "$EXIT_USAGE" ".branch tidak valid: $BRANCH" ;;
+esac
+case "$AGENT" in
+  ''|*[!A-Za-z0-9._-]*) die "$EXIT_USAGE" ".agent tidak valid: $AGENT" ;;
+esac
+case "$CHECKOUT" in
+  true|false) ;;
+  *) die "$EXIT_USAGE" ".checkout harus true/false" ;;
+esac
+
+# --- prompt --------------------------------------------------------------
+
+PROMPT="$(jq -r '
+  def bullets($k): (.[$k] // []) | map("- " + .) | join("\n");
+  "TUGAS: \(.id // "tanpa-id")\n" +
+  "BRANCH: \(.branch // "testing")\n\n" +
+  "TUJUAN:\n\(.goal)\n\n" +
+  (if ((.skills // []) | length) > 0 then "SKILL YANG WAJIB DIPAKAI:\n\(bullets("skills"))\n\n" else "" end) +
+  (if ((.constraints // []) | length) > 0 then "BATASAN:\n\(bullets("constraints"))\n\n" else "" end) +
+  (if ((.acceptance // []) | length) > 0 then "KRITERIA SELESAI:\n\(bullets("acceptance"))\n\n" else "" end)
+' "$TASK_FILE")"
+
+PROMPT+=$'\n\nINSTRUKSI KERJA:\n'
+PROMPT+=$'1. Baca README.md, HOSTINGER.md, dan docs/handoff-hermes-ubuntu.md lebih dulu.\n'
+PROMPT+=$'2. Kerjakan hanya yang diminta; jangan mengubah framework, DB, tema, atau navigasi.\n'
+PROMPT+=$'3. Jangan membaca atau mencetak .env, token, kunci, atau dump database.\n'
+PROMPT+=$'4. Verifikasi: `npm run typecheck`, `(cd server && npm run typecheck)`, `npm run build`.\n'
+PROMPT+=$'5. Commit perubahan di branch tugas dengan pesan bahasa Indonesia. JANGAN push, JANGAN deploy, JANGAN migrasi DB.\n'
+PROMPT+=$'6. Jika butuh keputusan manusia, berhenti dan tulis "BUTUH KEPUTUSAN: ...".\n'
+PROMPT+=$'7. Akhiri dengan: STATUS, RINGKASAN, FILE, VERIFIKASI, COMMIT, RISIKO/SISA.\n'
+
+# --- keluaran ------------------------------------------------------------
+
+emit_result() {
+  # Argumen: status, exit_code, commit, dirty, changed, ahead, summary, stage
+  jq -n \
+    --arg status "$1" \
+    --argjson exitCode "$2" \
+    --arg id "$TASK_ID" \
+    --arg branch "$BRANCH" \
+    --arg agent "$AGENT" \
+    --arg directory "$DIR" \
+    --arg commit "$3" \
+    --argjson dirty "$4" \
+    --argjson changed "$5" \
+    --argjson ahead "$6" \
+    --arg summary "$7" \
+    --arg stage "$8" \
+    --arg logFile "${LOG_FILE:-}" \
+    '{
+      status: $status,
+      id: $id,
+      branch: $branch,
+      agent: $agent,
+      directory: $directory,
+      commit: $commit,
+      dirtyFiles: $dirty,
+      changedFiles: $changed,
+      commitsAhead: $ahead,
+      logFile: $logFile,
+      stage: $stage,
+      summary: $summary,
+      exitCode: $exitCode
+    }' 2>/dev/null \
+    || printf '{"status":"%s","exitCode":%s,"id":"%s","stage":"%s"}\n' \
+      "$1" "$2" "$TASK_ID" "$8"
+}
+
+if [ "$DRY_RUN" -eq 1 ]; then
+  log "dry-run: tugas '$TASK_ID' valid, host=$SSH_HOST, dir=$DIR, branch=$BRANCH"
+  emit_result "dry-run" "$EXIT_OK" "" 0 0 0 "$PROMPT" "dry-run"
+  exit "$EXIT_OK"
+fi
+
+# --- preflight -----------------------------------------------------------
+
+if [ "$SKIP_PREFLIGHT" -eq 0 ]; then
+  log "preflight: $SSH_HOST:$DIR (branch=$BRANCH)"
+  if ! ssh "${SSH_OPTS[@]}" "$SSH_HOST" bash -s -- "$DIR" "$BRANCH" "$CHECKOUT" <<'REMOTE'
+set -euo pipefail
+dir="$1"
+branch="$2"
+do_checkout="$3"
+
+[ -d "$dir/.git" ] || { echo "bukan repo git: $dir" >&2; exit 3; }
+cd "$dir"
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "working tree kotor; commit/stash dulu:" >&2
+  git status --short >&2
+  exit 3
+fi
+
+git fetch --prune origin >/dev/null 2>&1 || { echo "git fetch gagal" >&2; exit 3; }
+
+cur="$(git rev-parse --abbrev-ref HEAD)"
+if [ "$cur" != "$branch" ]; then
+  if [ "$do_checkout" != "true" ]; then
+    echo "branch aktif '$cur', tugas minta '$branch' (set \"checkout\": true untuk pindah otomatis)" >&2
+    exit 3
+  fi
+  if git show-ref --verify --quiet "refs/heads/$branch"; then
+    git checkout "$branch" >&2
+  else
+    git checkout -b "$branch" --track "origin/$branch" >&2
+  fi
+fi
+
+git pull --ff-only origin "$branch" >/dev/null 2>&1 || { echo "pull bukan fast-forward" >&2; exit 3; }
+echo "preflight ok: branch=$branch head=$(git rev-parse --short HEAD)"
+REMOTE
+  then
+    emit_result "preflight-failed" "$EXIT_PREFLIGHT" "" 0 0 0 "preflight gagal, lihat stderr" "preflight"
+    exit "$EXIT_PREFLIGHT"
+  fi
+else
+  log "preflight dilewati atas permintaan (--skip-preflight)"
+fi
+
+# --- jalankan agen -------------------------------------------------------
+
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/$TASK_ID.ndjson"
+: >"$LOG_FILE"
+
+B64="$(printf '%s' "$PROMPT" | base64 | tr -d '\r\n')"
+SOFT_TIMEOUT=$((TASK_TIMEOUT > 120 ? TASK_TIMEOUT - 60 : TASK_TIMEOUT))
+HARD_TIMEOUT=$((TASK_TIMEOUT + 120))
+
+log "menjalankan opencode (agent=$AGENT, timeout=${TASK_TIMEOUT}s); log: $LOG_FILE"
+
+set +e
+timeout --signal=TERM --kill-after=30 "$HARD_TIMEOUT" \
+  ssh "${SSH_OPTS[@]}" "$SSH_HOST" bash -s -- "$DIR" "$AGENT" "$B64" "$SOFT_TIMEOUT" \
+  <<'REMOTE' 2>&1 | tee "$LOG_FILE" >/dev/null
+set -euo pipefail
+dir="$1"
+agent="$2"
+b64="$3"
+soft="$4"
+
+cd "$dir"
+prompt="$(printf '%s' "$b64" | base64 -d)"
+
+exec timeout --signal=INT --kill-after=60 "$soft" \
+  opencode run --agent "$agent" --format json --auto "$prompt"
+REMOTE
+RUN_RC="${PIPESTATUS[0]}"
+set -e
+
+if [ "$RUN_RC" -eq 124 ] || [ "$RUN_RC" -eq 137 ]; then
+  log "agen melewati batas waktu ${TASK_TIMEOUT}s"
+fi
+
+# --- laporan pasca-jalan -------------------------------------------------
+
+REPORT="$(ssh "${SSH_OPTS[@]}" "$SSH_HOST" bash -s -- "$DIR" "$BRANCH" <<'REMOTE' 2>/dev/null || true
+set -euo pipefail
+dir="$1"
+branch="$2"
+cd "$dir"
+head="$(git rev-parse HEAD)"
+cur="$(git rev-parse --abbrev-ref HEAD)"
+dirty="$(git status --porcelain | wc -l | tr -d ' ')"
+if git rev-parse --verify --quiet "origin/$branch" >/dev/null; then
+  changed="$(git diff --name-only "origin/$branch...HEAD" | wc -l | tr -d ' ')"
+  ahead="$(git rev-list --count "origin/$branch..HEAD" | tr -d ' ')"
+else
+  changed=0
+  ahead=0
+fi
+jq -n --arg head "$head" --arg branch "$cur" \
+  --argjson dirty "$dirty" --argjson changed "$changed" --argjson ahead "$ahead" \
+  '{commit:$head, branch:$branch, dirty:$dirty, changed:$changed, ahead:$ahead}'
+REMOTE
+)"
+
+COMMIT=""
+DIRTY=0
+CHANGED=0
+AHEAD=0
+
+if [ -n "$REPORT" ] && jq -e . >/dev/null 2>&1 <<<"$REPORT"; then
+  COMMIT="$(jq -r '.commit // ""' <<<"$REPORT")"
+  DIRTY="$(jq -r '.dirty // 0' <<<"$REPORT")"
+  CHANGED="$(jq -r '.changed // 0' <<<"$REPORT")"
+  AHEAD="$(jq -r '.ahead // 0' <<<"$REPORT")"
+fi
+
+SUMMARY="$(jq -r '
+  .. | objects | (.text? // .content? // empty) | strings
+' "$LOG_FILE" 2>/dev/null | awk 'NF && !seen[$0]++' | tail -n 25 || true)"
+
+if [ -z "$SUMMARY" ]; then
+  SUMMARY="$(tail -n 5 "$LOG_FILE" 2>/dev/null || true)"
+fi
+
+if [ "$RUN_RC" -ne 0 ]; then
+  STATUS="failed"
+  RC="$EXIT_RUN"
+elif [ "$DIRTY" -gt 0 ]; then
+  STATUS="needs-review"
+  RC="$EXIT_RUN"
+else
+  STATUS="ok"
+  RC="$EXIT_OK"
+fi
+
+log "status=$STATUS commit=${COMMIT:0:7} dirty=$DIRTY changed=$CHANGED ahead=$AHEAD"
+emit_result "$STATUS" "$RC" "$COMMIT" "$DIRTY" "$CHANGED" "$AHEAD" "$SUMMARY" "run"
+exit "$RC"

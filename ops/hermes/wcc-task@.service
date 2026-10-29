@@ -1,0 +1,27 @@
+[Unit]
+Description=Tugas WCC %i -> OpenCode
+Documentation=file:///home/hermes/wcc-handoff/docs/handoff-hermes-ubuntu.md
+After=network-online.target opencode-tunnel.service
+Wants=network-online.target
+# Tunnel opsional untuk topologi B; jangan gagalkan tugas bila tunnel mati.
+
+[Service]
+Type=oneshot
+User=hermes
+Group=hermes
+Environment=HOME=/home/hermes
+EnvironmentFile=-/etc/wcc/hermes.env
+WorkingDirectory=/home/hermes
+
+# /etc/wcc/tasks/<instance>.json harus dimiliki hermes dan tidak world-readable.
+ExecStart=/usr/local/bin/wcc-task /etc/wcc/tasks/%i.json
+TimeoutStartSec=2h
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/hermes/.local/state/wcc
+
+[Install]
+WantedBy=multi-user.target

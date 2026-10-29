@@ -1,0 +1,389 @@
+#!/usr/bin/env bash
+# wcc-deploy - deploy WCC dari homeserver ke Hostinger dengan gerbang manusia.
+#
+# Push HANYA terjadi lewat skrip ini dan hanya dengan --yes. Agen OpenCode
+# (agent "wcc") tidak boleh push; lihat .opencode/agents/wcc.md.
+#
+# Pemakaian:
+#   wcc-deploy --yes --to-main --task /etc/wcc/tasks/WCC-...json
+#   wcc-deploy --yes --sha <sha> --to-main
+#
+# Keluaran: satu objek JSON di stdout. Log manusia ada di stderr.
+
+set -euo pipefail
+
+PROG="$(basename -- "$0")"
+
+readonly EXIT_OK=0
+readonly EXIT_USAGE=2
+readonly EXIT_PREFLIGHT=3
+readonly EXIT_DEPLOY=4
+
+log() {
+  printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" >&2
+}
+
+die() {
+  local code="$1"
+  shift
+  log "GAGAL: $*"
+  exit "$code"
+}
+
+usage() {
+  cat <<EOF
+Pakai: $PROG --yes [opsi]
+
+Opsi:
+  --yes              wajib: konfirmasi manusia bahwa deploy disetujui
+  --to-main          promosikan ke main (memicu auto-deploy Hostinger)
+  --from <branch>    branch sumber (default: testing)
+  --sha <sha>        commit yang di-deploy (default: HEAD origin/<branch>)
+  --task <file>      ambil branch/sha dari task.json
+  --with-build       jalankan "npm run build" di homeserver sebelum push
+  --skip-wait        jangan tunggu build/health (hanya untuk darurat)
+  -h, --help         tampilkan bantuan ini
+
+Tanpa --to-main, skrip hanya menyinkronkan branch sumber (tidak deploy).
+
+Variabel lingkungan (dari /etc/wcc/hermes.env):
+  WCC_SSH_HOST, WCC_SSH_KEY, WCC_REPO_DIR
+  WCC_PROD_URL, HOSTINGER_API_TOKEN, HOSTINGER_ACCOUNT, HOSTINGER_DOMAIN
+  WCC_BUILD_TIMEOUT (default 600), WCC_HEALTH_DELAY (default 20)
+  WCC_ALLOW_BUILD_TRIGGER=1 untuk mencoba POST /builds (belum terverifikasi)
+
+Kode keluar:
+  0 sukses   2 usage/konfigurasi   3 preflight   4 push/build/health gagal
+EOF
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "$EXIT_USAGE" "perintah '$1' tidak ditemukan"
+}
+
+# --- argumen -------------------------------------------------------------
+
+CONFIRMED=0
+TO_MAIN=0
+WITH_BUILD=0
+SKIP_WAIT=0
+FROM_BRANCH=""
+SHA=""
+TASK_FILE=""
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit "$EXIT_OK"
+      ;;
+    --yes)
+      CONFIRMED=1
+      ;;
+    --to-main)
+      TO_MAIN=1
+      ;;
+    --with-build)
+      WITH_BUILD=1
+      ;;
+    --skip-wait)
+      SKIP_WAIT=1
+      ;;
+    --from)
+      shift
+      [ "$#" -gt 0 ] || die "$EXIT_USAGE" "--from butuh nilai"
+      FROM_BRANCH="$1"
+      ;;
+    --sha)
+      shift
+      [ "$#" -gt 0 ] || die "$EXIT_USAGE" "--sha butuh nilai"
+      SHA="$1"
+      ;;
+    --task)
+      shift
+      [ "$#" -gt 0 ] || die "$EXIT_USAGE" "--task butuh nilai"
+      TASK_FILE="$1"
+      ;;
+    *)
+      die "$EXIT_USAGE" "argumen tidak dikenal: $1"
+      ;;
+  esac
+  shift
+done
+
+[ "$CONFIRMED" -eq 1 ] || die "$EXIT_USAGE" "deploy butuh --yes (konfirmasi manusia)"
+
+require_cmd jq
+require_cmd curl
+require_cmd ssh
+require_cmd timeout
+
+if [ -n "$TASK_FILE" ]; then
+  [ -f "$TASK_FILE" ] || die "$EXIT_USAGE" "task tidak ada: $TASK_FILE"
+  jq -e . "$TASK_FILE" >/dev/null 2>&1 || die "$EXIT_USAGE" "JSON task tidak valid"
+  [ -n "$(jq -r '.goal // empty' "$TASK_FILE")" ] || die "$EXIT_USAGE" ".goal wajib diisi"
+  [ -n "$FROM_BRANCH" ] || FROM_BRANCH="$(jq -r '.branch // empty' "$TASK_FILE")"
+  [ -n "$SHA" ] || SHA="$(jq -r '.sha // empty' "$TASK_FILE")"
+fi
+
+[ -n "$FROM_BRANCH" ] || FROM_BRANCH="testing"
+SOURCE="$FROM_BRANCH"
+if [ "$TO_MAIN" -eq 1 ]; then
+  TARGET="main"
+else
+  TARGET="$SOURCE"
+fi
+
+case "$SOURCE" in
+  ''|*[!A-Za-z0-9._/-]*) die "$EXIT_USAGE" "branch sumber tidak valid: $SOURCE" ;;
+esac
+case "$SHA" in
+  *[!0-9a-fA-F]*) die "$EXIT_USAGE" "--sha harus hash hex" ;;
+esac
+
+# --- konfigurasi ---------------------------------------------------------
+
+SSH_HOST="${WCC_SSH_HOST:-wcc@homeserver}"
+SSH_KEY="${WCC_SSH_KEY:-}"
+REPO_DIR="${WCC_REPO_DIR:-/home/wcc/apps/WCC}"
+PROD_URL="${WCC_PROD_URL:-https://wisanggeniclub.site}"
+BUILD_TIMEOUT="${WCC_BUILD_TIMEOUT:-600}"
+HEALTH_DELAY="${WCC_HEALTH_DELAY:-20}"
+ALLOW_TRIGGER="${WCC_ALLOW_BUILD_TRIGGER:-0}"
+
+SSH_OPTS=(
+  -o BatchMode=yes
+  -o ConnectTimeout=15
+  -o ServerAliveInterval=30
+  -o ServerAliveCountMax=4
+)
+if [ -n "$SSH_KEY" ]; then
+  SSH_OPTS+=(-i "$SSH_KEY")
+fi
+
+# --- resolve commit ------------------------------------------------------
+
+log "resolve commit (sumber=$SOURCE, sha=${SHA:-HEAD})"
+SHA="$(ssh "${SSH_OPTS[@]}" "$SSH_HOST" bash -s -- "$REPO_DIR" "$SOURCE" "$SHA" <<'REMOTE'
+set -euo pipefail
+cd "$1"
+git fetch --prune origin "+refs/heads/*:refs/remotes/origin/*" >/dev/null 2>&1
+if [ -n "$3" ]; then
+  git rev-parse --verify "$3^{commit}"
+else
+  git rev-parse --verify "origin/$2^{commit}"
+fi
+REMOTE
+)" || die "$EXIT_PREFLIGHT" "commit tidak ditemukan di homeserver"
+
+SHA="$(printf '%s' "$SHA" | tr -d '\r\n' | tr 'A-F' 'a-f')"
+case "$SHA" in
+  *[!0-9a-f]*) die "$EXIT_PREFLIGHT" "sha tidak valid dari homeserver: $SHA" ;;
+esac
+[ "${#SHA}" -eq 40 ] || die "$EXIT_PREFLIGHT" "sha bukan 40 karakter: $SHA"
+
+log "deploy: commit=${SHA:0:7} sumber=$SOURCE target=$TARGET host=$SSH_HOST"
+
+# --- preflight & verifikasi ---------------------------------------------
+
+log "preflight: fetch, cek commit, fast-forward, typecheck"
+if ! ssh "${SSH_OPTS[@]}" "$SSH_HOST" bash -s -- "$REPO_DIR" "$SHA" "$TARGET" "$WITH_BUILD" <<'REMOTE'
+set -euo pipefail
+dir="$1"
+sha="$2"
+target="$3"
+with_build="$4"
+
+[ -d "$dir/.git" ] || { echo "bukan repo git: $dir" >&2; exit 3; }
+cd "$dir"
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "working tree kotor; deploy dibatalkan:" >&2
+  git status --short >&2
+  exit 3
+fi
+
+git fetch --prune origin "+refs/heads/*:refs/remotes/origin/*" >/dev/null 2>&1 \
+  || { echo "git fetch gagal" >&2; exit 3; }
+
+git cat-file -e "$sha^{commit}" 2>/dev/null \
+  || { echo "commit $sha tidak ada di homeserver" >&2; exit 3; }
+
+git merge-base --is-ancestor "origin/$target" "$sha" \
+  || { echo "bukan fast-forward: origin/$target bukan leluhur $sha" >&2; exit 3; }
+
+echo "menjalankan typecheck frontend" >&2
+npm run typecheck >&2
+
+echo "menjalankan typecheck backend" >&2
+(cd server && npm run typecheck) >&2
+
+if [ "$with_build" = "true" ]; then
+  echo "menjalankan build frontend" >&2
+  npm run build >&2
+fi
+
+echo "preflight ok: $sha siap masuk $target" >&2
+REMOTE
+then
+  die "$EXIT_PREFLIGHT" "preflight gagal (lihat pesan di atas)"
+fi
+
+# --- push ----------------------------------------------------------------
+
+log "push $SHA -> origin/$TARGET (fast-forward only)"
+if ! timeout 120 ssh "${SSH_OPTS[@]}" "$SSH_HOST" bash -s -- "$REPO_DIR" "$SHA" "$TARGET" <<'REMOTE'
+set -euo pipefail
+cd "$1"
+git push origin "$2:refs/heads/$3"
+REMOTE
+then
+  die "$EXIT_DEPLOY" "git push gagal"
+fi
+
+REMOTE_HEAD="$(ssh "${SSH_OPTS[@]}" "$SSH_HOST" bash -s -- "$REPO_DIR" "$TARGET" <<'REMOTE'
+set -euo pipefail
+cd "$1"
+git ls-remote origin "refs/heads/$2" | cut -f1
+REMOTE
+)" || die "$EXIT_DEPLOY" "tidak bisa memverifikasi ref remote"
+REMOTE_HEAD="$(printf '%s' "$REMOTE_HEAD" | tr -d '\r\n')"
+
+if [ "$REMOTE_HEAD" != "$SHA" ]; then
+  die "$EXIT_DEPLOY" "remote origin/$TARGET = ${REMOTE_HEAD:0:7}, bukan ${SHA:0:7}"
+fi
+
+if [ "$TARGET" != "main" ]; then
+  log "branch $TARGET tersinkron; tidak ada build (hanya main yang auto-deploy)"
+  jq -n \
+    --arg status "pushed" --arg sha "$SHA" --arg target "$TARGET" \
+    --arg source "$SOURCE" \
+    '{status:$status, sha:$sha, target:$target, source:$source, deploy:false, exitCode:0}'
+  exit "$EXIT_OK"
+fi
+
+if [ "$SKIP_WAIT" -eq 1 ]; then
+  log "menunggu build/health dilewati (--skip-wait)"
+  jq -n \
+    --arg status "pushed" --arg sha "$SHA" --arg target "$TARGET" \
+    '{status:$status, sha:$sha, target:$target, deploy:true, verified:false, exitCode:0}'
+  exit "$EXIT_OK"
+fi
+
+[ -n "${HOSTINGER_API_TOKEN:-}" ] || die "$EXIT_USAGE" "HOSTINGER_API_TOKEN belum diisi"
+[ -n "${HOSTINGER_ACCOUNT:-}" ] || die "$EXIT_USAGE" "HOSTINGER_ACCOUNT belum diisi"
+[ -n "${HOSTINGER_DOMAIN:-}" ] || die "$EXIT_USAGE" "HOSTINGER_DOMAIN belum diisi"
+
+# --- tunggu build --------------------------------------------------------
+
+BASE="https://developers.hostinger.com/api/hosting/v1/accounts/${HOSTINGER_ACCOUNT}/websites/${HOSTINGER_DOMAIN}/nodejs"
+BUILDS_URL="${BASE}/builds"
+AUTH=(-H "Authorization: Bearer ${HOSTINGER_API_TOKEN}")
+
+log "menunggu build Hostinger untuk ${SHA:0:7} (maks ${BUILD_TIMEOUT}s)"
+BUILD_STATE=""
+BUILD_FOUND=0
+TRIGGERED=0
+SECONDS=0
+
+while [ "$SECONDS" -lt "$BUILD_TIMEOUT" ]; do
+  if BUILDS="$(curl -fsS --max-time 20 "${AUTH[@]}" "$BUILDS_URL" 2>/dev/null)"; then
+    BUILD_STATE="$(jq -r --arg sha "$SHA" '
+      [ .data[]
+        | (.options.source_options.commit.hash // "") as $h
+        | select(($h | startswith($sha)) or ($sha | startswith($h)))
+        | (.state // "unknown")
+      ][0] // ""
+    ' <<<"$BUILDS" 2>/dev/null || true)"
+
+    if [ -n "$BUILD_STATE" ]; then
+      BUILD_FOUND=1
+    fi
+  fi
+
+  log "build state=${BUILD_STATE:-menunggu} (${SECONDS}s)"
+
+  [ "$BUILD_STATE" = "completed" ] && break
+  [ "$BUILD_STATE" = "failed" ] && break
+
+  if [ -z "$BUILD_STATE" ] && [ "$TRIGGERED" -eq 0 ] && [ "$SECONDS" -ge 90 ]; then
+    if [ "$ALLOW_TRIGGER" = "1" ]; then
+      log "tidak ada build terdeteksi; mencoba memicu build manual"
+      if curl -fsS --max-time 30 -X POST "${AUTH[@]}" "$BUILDS_URL" >/dev/null 2>&1; then
+        log "permintaan build terkirim"
+      else
+        log "pemicuan build gagal; picu manual di panel Hostinger"
+      fi
+      TRIGGERED=1
+    else
+      log "tidak ada build untuk commit ini; picu manual atau set WCC_ALLOW_BUILD_TRIGGER=1"
+      TRIGGERED=1
+    fi
+  fi
+
+  sleep 15
+done
+
+if [ "$BUILD_STATE" != "completed" ]; then
+  log "build tidak selesai (state=${BUILD_STATE:-tidak ditemukan})"
+  jq -n \
+    --arg status "build-failed" --arg sha "$SHA" --arg state "$BUILD_STATE" \
+    --argjson found "$BUILD_FOUND" \
+    '{status:$status, sha:$sha, buildState:$state, buildFound:($found == 1), exitCode:4}'
+  exit "$EXIT_DEPLOY"
+fi
+
+# --- verifikasi produksi -------------------------------------------------
+
+log "build selesai; verifikasi produksi"
+
+http_code() {
+  curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$1" 2>/dev/null || echo "000"
+}
+
+HEALTH_SAMPLES="[]"
+HEALTH_OK=0
+i=1
+while [ "$i" -le 3 ]; do
+  if BODY="$(curl -fsS --max-time 15 "${PROD_URL}/api/health?cb=$(date +%s%N)" 2>/dev/null)" \
+    && jq -e . >/dev/null 2>&1 <<<"$BODY"; then
+    IS_OK="$(jq -r '.ok // false' <<<"$BODY")"
+    HEALTH_SAMPLES="$(jq -c --arg ts "$(date -u +%FT%TZ)" --argjson body "$BODY" \
+      '. + [{checkedAt:$ts, ok:($body.ok // false), bootedAt:($body.bootedAt // null), uptimeSec:($body.uptimeSec // null)}]' \
+      <<<"$HEALTH_SAMPLES")"
+    if [ "$IS_OK" = "true" ]; then
+      HEALTH_OK=$((HEALTH_OK + 1))
+    fi
+  else
+    log "health check $i gagal dihubungi"
+  fi
+  i=$((i + 1))
+  if [ "$i" -le 3 ]; then
+    sleep "$HEALTH_DELAY"
+  fi
+done
+
+LANDING_CODE="$(http_code "${PROD_URL}/")"
+LOGIN_CODE="$(http_code "${PROD_URL}/masuk")"
+API_CODE="$(http_code "${PROD_URL}/api/landing?cb=$(date +%s%N)")"
+
+log "health ok=$HEALTH_OK/3 landing=$LANDING_CODE login=$LOGIN_CODE api=$API_CODE"
+
+if [ "$HEALTH_OK" -lt 3 ] || [ "$LANDING_CODE" != "200" ] || [ "$API_CODE" != "200" ]; then
+  jq -n \
+    --arg status "unhealthy" --arg sha "$SHA" --arg state "$BUILD_STATE" \
+    --argjson health "$HEALTH_SAMPLES" --argjson healthOk "$HEALTH_OK" \
+    --arg landing "$LANDING_CODE" --arg login "$LOGIN_CODE" --arg api "$API_CODE" \
+    '{status:$status, sha:$sha, buildState:$state, healthOk:$healthOk, health:$health,
+      http:{landing:$landing, login:$login, api:$api}, exitCode:4}'
+  exit "$EXIT_DEPLOY"
+fi
+
+jq -n \
+  --arg status "deployed" --arg sha "$SHA" --arg state "$BUILD_STATE" \
+  --argjson health "$HEALTH_SAMPLES" --argjson healthOk "$HEALTH_OK" \
+  --arg landing "$LANDING_CODE" --arg login "$LOGIN_CODE" --arg api "$API_CODE" \
+  '{status:$status, sha:$sha, buildState:$state, healthOk:$healthOk, health:$health,
+    http:{landing:$landing, login:$login, api:$api}, exitCode:0}'
+
+log "deploy sukses: ${SHA:0:7} build=$BUILD_STATE health=3/3"
