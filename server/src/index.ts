@@ -28,6 +28,13 @@ const server = app.listen(env.port, () => {
   startSyncScheduler()
 })
 
+// Batas waktu koneksi agar permintaan yang macet tidak menumpuk di antrean
+// reverse proxy. Tanpa ini, Node membiarkan koneksi menggantung hingga 5 menit
+// dan proxy bisa membalas 503 "The server is temporarily busy".
+server.requestTimeout = 60_000
+server.headersTimeout = 30_000
+server.keepAliveTimeout = 65_000
+
 /** Menjalankan sinkronisasi berkala bila diaktifkan lewat SHEETS_SYNC_INTERVAL_MINUTES. */
 function startSyncScheduler(): void {
   if (env.sheetsSyncIntervalMinutes <= 0) return
@@ -55,3 +62,16 @@ async function shutdown(signal: string): Promise<void> {
 
 process.on('SIGINT', () => void shutdown('SIGINT'))
 process.on('SIGTERM', () => void shutdown('SIGTERM'))
+
+// Catat kesalahan tak tertangani supaya penyebab matinya aplikasi terlihat di
+// runtime log hosting (sebelumnya proses bisa berhenti tanpa jejak apa pun).
+process.on('unhandledRejection', (reason) => {
+  console.error(`[unhandledRejection] ${new Date().toISOString()}`, reason)
+})
+
+process.on('uncaughtException', (error) => {
+  console.error(`[uncaughtException] ${new Date().toISOString()}`, error)
+  // Keluar dengan kode gagal agar process manager (Passenger/Hostinger)
+  // menyalakan ulang proses baru, bukan melanjutkan dengan state rusak.
+  process.exit(1)
+})
