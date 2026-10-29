@@ -24,6 +24,9 @@ import { paymentRouter } from './routes/payments'
 import { userRouter } from './routes/users'
 import { uploadDir } from './lib/uploads'
 
+/** Waktu modul dimuat (proses mulai), dipakai endpoint /api/health. */
+const bootedAt = new Date()
+
 export function createApp() {
   const app = express()
 
@@ -66,7 +69,15 @@ export function createApp() {
   app.use(attachAuth)
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, service: 'wcc-server', time: new Date().toISOString() })
+    res.json({
+      ok: true,
+      service: 'wcc-server',
+      time: new Date().toISOString(),
+      // Berguna untuk memastikan proses yang menjawab adalah proses baru
+      // setelah deploy/restart (bukan proses lama yang masih menggantung).
+      bootedAt: bootedAt.toISOString(),
+      uptimeSec: Math.round(process.uptime()),
+    })
   })
 
   // Berkas unggahan (bukti transaksi, foto coach) disajikan sebagai statis.

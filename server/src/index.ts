@@ -55,9 +55,21 @@ function startSyncScheduler(): void {
 
 async function shutdown(signal: string): Promise<void> {
   console.log(`\n${signal} diterima, menutup server...`)
+
+  // Jangan menunggu selamanya. Koneksi keep-alive dari reverse proxy dapat
+  // membuat server.close() tidak pernah selesai; proses lama lalu tetap hidup
+  // dan menahan port sehingga proses baru gagal listen (gejala 503).
+  const forceExit = setTimeout(() => {
+    console.warn('  Penutupan melebihi 8 detik, keluar paksa.')
+    process.exit(0)
+  }, 8_000)
+  forceExit.unref()
+
   server.close(() => {
-    void pool.end().then(() => process.exit(0))
+    void pool.end().finally(() => process.exit(0))
   })
+  server.closeIdleConnections()
+  setTimeout(() => server.closeAllConnections(), 2_000).unref()
 }
 
 process.on('SIGINT', () => void shutdown('SIGINT'))
