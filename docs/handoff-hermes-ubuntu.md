@@ -9,8 +9,7 @@ dibutuhkan, plus runbook deploy WISANGGENI CLIMBING CLUB (WCC).
 - Produksi: `https://wisanggeniclub.site` (Hostinger Node.js / LiteSpeed–Passenger, Node 22)
 - Database: Supabase PostgreSQL (`iiwujuwliqlwgdhdtayw`, region `ap-southeast-1`)
 - Stack: React 18 + Vite 8 (frontend) / Express 4 + PostgreSQL (backend), satu origin
-- Versi dokumen: 1.1 — 2026-10-29
-- Otomasi Hermes: `ops/hermes/` (lihat Bagian 4 dan `ops/hermes/README.md`)
+- Versi dokumen: 1.0 — 2026-10-29
 
 > **PENTING:** semua nilai rahasia di dokumen ini ditulis sebagai placeholder
 > `<...>`. Jangan pernah menaruh token asli di repo, di prompt, atau di file ini.
@@ -21,27 +20,16 @@ dibutuhkan, plus runbook deploy WISANGGENI CLIMBING CLUB (WCC).
 ## 0. Cara memakai dokumen ini
 
 1. Kirim file ini ke Hermes.
-2. Minta Hermes menjalankan **Bagian 1–4** (setup host + OpenCode + koneksi),
-   lalu memasang skrip di `ops/hermes/` (lihat `ops/hermes/README.md`).
+2. Minta Hermes menjalankan **Bagian 1–4** (setup host + OpenCode + koneksi).
 3. Minta Hermes meng-install **skill** di Bagian 5 dan menyiapkan kredensial di Bagian 6.
 4. Setelah smoke test lolos, gunakan **prompt siap tempel** di Bagian 11 untuk
    operasi harian.
-
-Skrip yang sudah tersedia (jangan ditulis ulang dari nol):
-
-| File | Fungsi |
-|---|---|
-| `ops/hermes/wcc-task` | kirim tugas JSON ke OpenCode, preflight, log NDJSON |
-| `ops/hermes/wcc-deploy` | push fast-forward + tunggu build + verifikasi (butuh `--yes`) |
-| `ops/hermes/wcc-task@.service` | unit systemd oneshot per tugas |
-| `ops/hermes/opencode-tunnel.service` | tunnel SSH ke homeserver |
-| `ops/hermes/hermes.env.example` | contoh variabel lingkungan |
 
 Urutan eksekusi yang aman:
 
 ```
 Prasyarat Ubuntu → OpenCode + systemd → Koneksi Hermes↔OpenCode
-→ ops/hermes → Skills → Kredensial → Smoke test → Baru boleh deploy
+→ Skills → Kredensial → Smoke test → Baru boleh deploy
 ```
 
 ---
@@ -224,22 +212,26 @@ paling bawah setelah `deny`, atau larangan akan tertimpa.
 
 ### 3.4 Agent khusus WCC
 
-Agent sudah tersedia di repo: `/home/wcc/apps/WCC/.opencode/agents/wcc.md`.
-File ini ikut ter-review dan otomatis dipakai saat `--agent wcc`.
+Buat `~/.config/opencode/agents/wcc.md` (home user `wcc`) **atau**
+`/home/wcc/apps/WCC/.opencode/agents/wcc.md` (per-repo, lebih baik — ikut ter-review):
 
-Isinya menetapkan:
+```markdown
+---
+description: Eksekutor repo WISANGGENI CLIMBING CLUB (React+Vite / Express+PostgreSQL)
+mode: primary
+---
 
-- hanya boleh **commit lokal**; `git push`, `git reset --hard`, `sudo`,
-  `rm -rf`, dan sejenisnya **ditolak** oleh permission;
-- tidak boleh membaca `.env`, kunci, atau dump database;
-- wajib menjalankan `npm run typecheck`, `(cd server && npm run typecheck)`,
-  dan `npm run build`;
-- wajib berhenti dan menulis `BUTUH KEPUTUSAN: ...` bila tugas ambigu atau
-  menyentuh skema DB.
+Kamu bekerja pada repo WCC di /home/wcc/apps/WCC.
 
-Jangan membuat agent global yang mengizinkan push. Kalau benar-benar perlu
-agent global, salin file yang sama ke `~/.config/opencode/agents/wcc.md`,
-tetapi versi repo tetap menjadi acuan. Verifikasinya ada di Bagian 8 butir 4.
+Aturan wajib:
+1. Baca README.md, HOSTINGER.md, dan docs/handoff-hermes-ubuntu.md sebelum mengubah apa pun.
+2. Jangan pernah membaca, mencetak, atau meng-commit file .env / kredensial.
+3. Jangan mengubah framework, database, tema, atau struktur navigasi tanpa diminta.
+4. Ikuti pola kode yang sudah ada (bahasa komentar Indonesia, nama file, dsb).
+5. Setiap perubahan: `npm run typecheck`, `cd server && npm run typecheck`, lalu `npm run build`.
+6. Deploy hanya setelah semua pemeriksaan lolos dan pengguna menyetujui.
+7. Laporkan: file yang diubah, hasil perintah verifikasi, commit hash, status build.
+```
 
 ### 3.5 Jalankan sebagai service (systemd)
 
@@ -340,20 +332,28 @@ Jangan pernah mencetak token/password ke log Hermes. Simpan di
 
 Di host Hermes, buat tunnel permanen.
 
-Unit siap pakai ada di repo: `ops/hermes/opencode-tunnel.service`. Ganti
-`wcc@HOMESERVER` dan path kunci, lalu pasang:
-
-```bash
-sudo install -m 0644 ops/hermes/opencode-tunnel.service /etc/systemd/system/
-```
-
-Inti perintahnya:
+`/etc/systemd/system/opencode-tunnel.service`:
 
 ```ini
-ExecStart=/usr/bin/ssh -NT -o ExitOnForwardFailure=yes \
-  -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+[Unit]
+Description=SSH tunnel ke OpenCode homeserver
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=hermes
+ExecStart=/usr/bin/ssh -NT \
+  -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
   -i /home/hermes/.ssh/id_ed25519_wcc \
-  -L 127.0.0.1:4096:127.0.0.1:4096 wcc@HOMESERVER
+  -L 127.0.0.1:4096:127.0.0.1:4096 \
+  wcc@<HOMESERVER_IP_ATAU_HOSTNAME>
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 ```bash
@@ -391,33 +391,24 @@ ssh wcc@<HOMESERVER> 'cd /home/wcc/apps/WCC && \
 - `--format json` → keluaran NDJSON, mudah diparse Hermes.
 - `--continue` melanjutkan sesi terakhir; `--session ses_xxx` melanjutkan sesi tertentu.
 
-Skrip siap pakai: `ops/hermes/wcc-task` (pasang ke `/usr/local/bin/wcc-task`).
-Jangan menulis ulang dari nol; skrip ini sudah menangani validasi JSON,
-preflight repo, pengiriman prompt base64, timeout, log NDJSON, dan laporan
-commit.
+Bungkus jadi skrip di Hermes (`/usr/local/bin/wcc-task`). Prompt dikirim
+sebagai base64 agar aman dari tanda kutip/spasi:
 
 ```bash
-sudo install -m 0755 ops/hermes/wcc-task /usr/local/bin/wcc-task
-wcc-task --dry-run ops/hermes/task.example.json | jq '{status, id, stage}'
-wcc-task /etc/wcc/tasks/WCC-2026-10-29-001.json | jq
+#!/usr/bin/env bash
+set -euo pipefail
+TASK_FILE="${1:?pakai: wcc-task task.json}"
+GOAL="$(jq -r '.goal' "$TASK_FILE")"
+AGENT="$(jq -r '.agent // "wcc"' "$TASK_FILE")"
+DIR="$(jq -r '.directory // "/home/wcc/apps/WCC"' "$TASK_FILE")"
+B64="$(printf '%s' "$GOAL" | base64 -w0)"
+
+ssh wcc@<HOMESERVER> \
+  "cd '$DIR' && opencode run --agent '$AGENT' --format json --auto \"\$(printf '%s' '$B64' | base64 -d)\""
 ```
 
-Alurnya:
-
-1. Validasi tugas + field wajib.
-2. Preflight di homeserver: repo ada, tree bersih, `git fetch`,
-   branch cocok (atau `checkout: true`), `pull --ff-only`.
-3. Prompt = tujuan + skill + batasan + kriteria + instruksi wajib.
-4. `opencode run --agent wcc --format json --auto` dengan batas waktu.
-5. Log mentah: `WCC_LOG_DIR/<id>.ndjson`.
-6. Stdout: satu JSON (`status`, `commit`, `dirtyFiles`, `summary`, …).
-7. Kode keluar: `0` ok, `2` usage, `3` preflight, `4` agen gagal /
-   meninggalkan perubahan belum di-commit (`needs-review`).
-
-Detail pemasangan, skema tugas, dan systemd ada di `ops/hermes/README.md`.
-
 > `--auto` menyetujui semua permission yang tidak dilarang config. Pastikan
-> larangan di Bagian 3.3 dan agent `wcc` sudah aktif sebelum memakai `--auto`.
+> larangan di Bagian 3.3 sudah aktif sebelum memakai `--auto`.
 
 ### Mode B — HTTP API (untuk tugas panjang, streaming, atau banyak sesi)
 
@@ -489,7 +480,6 @@ Endpoint lain yang berguna:
   "directory": "/home/wcc/apps/WCC",
   "branch": "testing",
   "agent": "wcc",
-  "checkout": false,
   "skills": ["systematic-debugging", "verification-before-completion"],
   "goal": "Landing: carousel kegiatan tidak konsisten di mode gelap. Perbaiki tanpa mengubah tema.",
   "constraints": [
@@ -508,11 +498,6 @@ Endpoint lain yang berguna:
   "report": { "format": "markdown", "channel": "<kanal Hermes>" }
 }
 ```
-
-Field yang dibaca `wcc-task`: `goal`, `id`, `branch`, `agent`, `directory`,
-`checkout`, `skills`, `constraints`, `acceptance`. `repo`, `deploy`, dan
-`report` hanya informatif; `wcc-deploy` tetap butuh `--yes` dan tidak membaca
-`deploy`.
 
 ### 4.2 Aturan laporan balik
 
@@ -777,20 +762,6 @@ Branch `testing` **tidak** di-deploy otomatis. Hanya `main`.
 
 ### 7.3 Deploy & verifikasi build
 
-**Jalur utama (dijaga):**
-
-```bash
-sudo -u hermes bash -c 'set -a; . /etc/wcc/hermes.env; set +a; \
-  wcc-deploy --yes --to-main --task /etc/wcc/tasks/WCC-2026-10-29-001.json'
-```
-
-`wcc-deploy` melakukan preflight, push fast-forward
-`<sha>:refs/heads/main`, polling build, lalu verifikasi 7.4. Tanpa `--yes`
-tidak ada push. Tanpa `--to-main`, hanya branch sumber yang disinkronkan
-(tidak memicu build). Detail: `ops/hermes/README.md`.
-
-**Jalur manual (untuk debug):**
-
 ```bash
 # variabel dari ~/.hermes/.env (jangan tulis token di command line)
 set -a; source ~/.hermes/.env; set +a
@@ -917,10 +888,6 @@ git status -sb
 npm ci && npm run typecheck && npm run build
 (cd server && npm ci && npm run typecheck)
 
-# 3b. Skrip Hermes valid
-bash -n /usr/local/bin/wcc-task /usr/local/bin/wcc-deploy
-wcc-task --dry-run ops/hermes/task.example.json | jq -e '.status == "dry-run"'
-
 # 4. Agen bisa menjawab tanpa mengubah file
 opencode run --agent wcc --format json --auto \
   "Baca README.md dan HOSTINGER.md. Sebutkan stack, entry point, dan 3 aturan deploy. Jangan ubah file."
@@ -995,8 +962,6 @@ curl -fsS -X POST -H "Authorization: Bearer $TOKEN" "$RESTART_URL"
 
 **Operasional**
 - [ ] Hermes punya skema tugas + format laporan (Bagian 4)
-- [ ] `ops/hermes/wcc-task` dan `wcc-deploy` terpasang; dry-run lolos
-- [ ] Push/deploy hanya lewat `wcc-deploy --yes`; agen tidak bisa push
 - [ ] Satu repo = satu tugas aktif; worktree untuk paralel
 - [ ] Alert dikirim ke kanal yang dipantau manusia
 - [ ] Dokumen ini disimpan di repo (`docs/handoff-hermes-ubuntu.md`) dan di Hermes
@@ -1041,16 +1006,16 @@ sudo systemctl status opencode --no-pager
 curl -fsS -u "opencode:$PW" http://127.0.0.1:4096/api/info | jq '.version'
 
 # tugas non-interaktif
-wcc-task /etc/wcc/tasks/<id>.json | jq '{status, commit, dirtyFiles}'
+opencode run --agent wcc --auto "..."
 
 # sesi HTTP
 SID=$(curl -fsS -u "opencode:$PW" -H 'content-type: application/json' \
   -d '{"agent":"wcc","location":{"directory":"/home/wcc/apps/WCC"}}' \
   http://127.0.0.1:4096/api/session | jq -r '.data.id')
 
-# deploy WCC (butuh persetujuan manusia)
-wcc-deploy --yes --to-main --sha <sha>
-# skrip menunggu /builds dan memverifikasi /api/health
+# deploy WCC
+git push origin main
+# pantau /builds sampai state=completed, lalu cek /api/health
 
 # log runtime (variabel dari 7.3)
 curl -fsS "${AUTH[@]}" "$LOGS_URL?period=1h&limit=100" \
@@ -1059,10 +1024,8 @@ curl -fsS "${AUTH[@]}" "$LOGS_URL?period=1h&limit=100" \
 
 ## Lampiran B — Variabel yang harus diisi di sisi Hermes
 
-Contoh lengkap dan siap salin: `ops/hermes/hermes.env.example`.
-
 ```bash
-# /etc/wcc/hermes.env  (0640 root:hermes)
+# ~/.hermes/.env  (chmod 600)
 OPENCODE_SERVER_URL=http://127.0.0.1:4096
 OPENCODE_SERVER_USERNAME=opencode
 OPENCODE_SERVER_PASSWORD=<...>
@@ -1073,11 +1036,6 @@ GITHUB_TOKEN=<...>
 HOSTINGER_API_TOKEN=<...>
 HOSTINGER_ACCOUNT=<...>
 HOSTINGER_DOMAIN=wisanggeniclub.site
-
-WCC_SSH_HOST=wcc@<HOMESERVER>
-WCC_SSH_KEY=/home/hermes/.ssh/id_ed25519_wcc
-WCC_REPO_DIR=/home/wcc/apps/WCC
-WCC_PROD_URL=https://wisanggeniclub.site
 
 SUPABASE_PROJECT_REF=iiwujuwliqlwgdhdtayw
 SUPABASE_ACCESS_TOKEN=<...>
