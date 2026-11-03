@@ -14,6 +14,7 @@ import { newId } from '../lib/ids'
 import { wibInstant } from '../lib/time'
 import { requireAuth, requireRole } from '../middleware/auth'
 import type { AttendanceStatus } from '../types'
+import { sendPushToUsers } from '../lib/push'
 
 export const sessionRouter = Router()
 
@@ -100,7 +101,12 @@ sessionRouter.post(
         input.cancelled ?? false,
       ],
     )
+    const { rows: members } = await query<{ id: string }>("select id from users where role = 'anggota'")
     res.status(201).json(mapSession(rows[0]))
+    void sendPushToUsers(
+      members.map((m) => m.id),
+      { title: 'Sesi Latihan Baru', body: `${input.title} — ${input.date}`, url: '/app/jadwal', icon: '/logo-wcc.png' },
+    )
   }),
 )
 

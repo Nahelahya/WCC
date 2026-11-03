@@ -6,6 +6,7 @@ import { wrap } from '../lib/async'
 import { mapAnnouncement, type AnnouncementRow } from '../lib/mappers'
 import { newId } from '../lib/ids'
 import { requireAuth, requireRole } from '../middleware/auth'
+import { sendPushToAll } from '../lib/push'
 
 export const announcementRouter = Router()
 
@@ -70,6 +71,9 @@ announcementRouter.post(
       ],
     )
     res.status(201).json(mapAnnouncement(rows[0]))
+    if (rows[0].published) {
+      void sendPushToAll({ title: 'Pengumuman WCC', body: input.title, url: '/app/pengumuman', icon: '/logo-wcc.png' })
+    }
   }),
 )
 
