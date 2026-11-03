@@ -626,6 +626,7 @@ paymentRouter.post(
     const status = String(payload.transaction?.status ?? '').toUpperCase()
     if (status === 'SUCCESS') {
       const applied = await applyPaid(payment.id, payload)
+      res.json({ ok: true })
       if (applied?.user_id) {
         void sendPushToUser(applied.user_id, {
           title: 'Pembayaran Diterima',
@@ -634,6 +635,7 @@ paymentRouter.post(
           icon: '/logo-wcc.png',
         })
       }
+      return
     } else if (status === 'FAILED' || status === 'EXPIRED') {
       await query(
         `update payments set status = $2, notification = $3, updated_at = now()
