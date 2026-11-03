@@ -230,7 +230,7 @@ export function ProfilePage() {
       {/* ID Card & QR Code */}
       <div className="card mb-6 p-5">
         <h3 className="mb-3 text-sm font-semibold text-ink">ID Card &amp; QR Code Absensi</h3>
-        <MemberIdCard userId={user!.id} name={user!.name} photoUrl={user!.photoUrl} memberNumber={user!.id} />
+        <MemberIdCard userId={user!.id} name={user!.name} role={user!.role} />
       </div>
 
       {user!.role === 'anggota' && (

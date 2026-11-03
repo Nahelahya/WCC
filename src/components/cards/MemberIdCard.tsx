@@ -2,143 +2,212 @@ import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { userApi } from '@/api/client'
 import { Button } from '@/components/ui/Button'
-import { Icon } from '@/components/ui/Icon'
 import { useToast } from '@/context/ToastContext'
+import type { Role } from '@/types'
+import {
+  CARD_HEIGHT,
+  CARD_WIDTH,
+  ROLE_LABEL,
+  buildCardPdf,
+  downloadBlob,
+  downloadPng,
+  drawBack,
+  drawFront,
+  loadCardAssets,
+  type CardAssets,
+} from '@/lib/memberCard'
 
 interface Props {
   userId: string
   name: string
-  photoUrl?: string
-  memberNumber?: string
+  role: Role
+  /** `stacked` dipakai di dalam modal yang sempit. */
+  layout?: 'grid' | 'stacked'
 }
 
-/** Escape HTML supaya nilai pengguna (name, photoUrl, memberNumber) tidak
- *  bisa mengexekusi markup saat disisipkan ke dokumen cetak. */
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
+function fileSlug(value: string): string {
+  return (
+    value
+      .normalize('NFKD')
+      .replace(/[^\w\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .toLowerCase() || 'anggota'
+  )
 }
 
-/** Hanya izinkan skema aman untuk `photoUrl` pada data cetak (H-03).
- *  `data:` diperbolehkan karena QR card di-generate server-side. */
-function isSafeUrl(value: string): boolean {
-  if (!value) return false
-  try {
-    const u = new URL(value)
-    return u.protocol === 'https:' || u.protocol === 'http:' || u.protocol === 'data:'
-  } catch {
-    return false
-  }
-}
-
-export function MemberIdCard({ userId, name, photoUrl, memberNumber }: Props) {
+export function MemberIdCard({ userId, name, role, layout = 'grid' }: Props) {
   const { toast } = useToast()
-  const [token, setToken] = useState<string | null>(null)
-  const [qrUrl, setQrUrl] = useState<string | null>(null)
+  const [assets, setAssets] = useState<CardAssets | null>(null)
   const [loading, setLoading] = useState(true)
-  const cardRef = useRef<HTMLDivElement>(null)
+  const [error, setError] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const [downloading, setDownloading] = useState<'front' | 'back' | 'pdf' | null>(null)
+  const frontRef = useRef<HTMLCanvasElement>(null)
+  const backRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setError(false)
+    setAssets(null)
+
     userApi
       .getAttendanceToken(userId)
       .then(async (res) => {
+        // QR existing dipertahankan apa adanya (token, opsi, dan isi tidak diubah).
+        const qrUrl = await QRCode.toDataURL(res.token, {
+          width: 240,
+          margin: 1,
+          errorCorrectionLevel: 'M',
+        })
         if (cancelled) return
-        setToken(res.token)
-        const url = await QRCode.toDataURL(res.token, { width: 240, margin: 1, errorCorrectionLevel: 'M' })
-        if (!cancelled) setQrUrl(url)
+        const loaded = await loadCardAssets(qrUrl)
+        if (!cancelled) setAssets(loaded)
       })
       .catch(() => {
-        if (!cancelled) toast('Gagal memuat QR ID card.', 'error')
+        if (cancelled) return
+        setError(true)
+        toast('Gagal memuat kartu anggota.', 'error')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+
     return () => {
       cancelled = true
     }
-  }, [userId, toast])
+  }, [userId, toast, attempt])
 
-  async function download() {
-    if (!qrUrl) return
-    const a = document.createElement('a')
-    a.href = qrUrl
-    a.download = `id-card-qr-${userId}.png`
-    a.click()
+  useEffect(() => {
+    if (!assets) return
+    if (frontRef.current) drawFront(frontRef.current, assets, { name, role })
+    if (backRef.current) drawBack(backRef.current, assets)
+  }, [assets, name, role])
+
+  async function handlePng(side: 'front' | 'back') {
+    const canvas = side === 'front' ? frontRef.current : backRef.current
+    if (!canvas) return
+    setDownloading(side)
+    try {
+      await downloadPng(
+        canvas,
+        `kartu-anggota-${fileSlug(name)}-${side === 'front' ? 'depan' : 'belakang'}.png`,
+      )
+    } catch {
+      toast('Gagal mengunduh PNG.', 'error')
+    } finally {
+      setDownloading(null)
+    }
   }
 
-  function printCard() {
-    if (!cardRef.current) return
-    const w = window.open('', '_blank', 'width=420,height=620')
-    if (!w) return
-    const photoSrc = isSafeUrl(photoUrl ?? '') ? escapeHtml(photoUrl ?? '') : ''
-    const body = `
-      <div class="card">
-        ${photoSrc ? `<img class="photo" src="${photoSrc}" alt="" />` : ''}
-        <div class="name">${escapeHtml(name)}</div>
-        <div class="num">${escapeHtml(memberNumber ?? userId)}</div>
-        ${qrUrl ? `<img class="qr" src="${escapeHtml(qrUrl)}" alt="QR" />` : ''}
-        <div class="num">WISANGGENI CLIMBING CLUB</div>
-      </div>
-    `
-    // Semua nilai tersisip sudah di-escape; tidak ada markup pengguna yang
-    // bersifat mentah. `photoUrl` hanya boleh dari skema http(s)/data.
-    w.document.write(`
-      <html><head><title>ID Card ${escapeHtml(name)}</title>
-      <style>
-        body { font-family: system-ui, sans-serif; display:flex; justify-content:center; padding:24px; }
-        .card { width: 320px; border:1px solid #ddd; border-radius:16px; padding:20px; text-align:center; }
-        .name { font-size:18px; font-weight:700; margin:8px 0 2px; }
-        .num { font-size:12px; color:#666; }
-        img.qr { width:200px; height:200px; margin:12px auto; }
-        .photo { width:72px; height:72px; border-radius:50%; object-fit:cover; margin:0 auto 8px; }
-      </style></head><body>${body}</body></html>
-    `)
-    w.document.close()
-    // Cetak setelah isi halaman siap (tanpa inline <script> yang blokir CSP).
-    w.addEventListener('load', () => {
-      setTimeout(() => {
-        try { w.print() } catch {
-          // ignore jika jendela sudah ditutup / diblokir
-        }
-      }, 500)
-    })
+  function handlePdf() {
+    if (!frontRef.current || !backRef.current) return
+    setDownloading('pdf')
+    try {
+      downloadBlob(
+        buildCardPdf([frontRef.current, backRef.current]),
+        `kartu-anggota-${fileSlug(name)}.pdf`,
+      )
+    } catch {
+      toast('Gagal mengunduh PDF.', 'error')
+    } finally {
+      setDownloading(null)
+    }
   }
 
   if (loading) {
-    return <p className="text-sm text-muted">Memuat QR Code…</p>
+    return (
+      <div className="grid gap-4" aria-busy="true" aria-label="Memuat kartu anggota">
+        <div className="aspect-[1600/1135] w-full animate-pulse rounded-card bg-line/40" />
+        <div className="aspect-[1600/1135] w-full animate-pulse rounded-card bg-line/40" />
+      </div>
+    )
   }
+
+  if (error || !assets) {
+    return (
+      <div className="rounded-card border border-line bg-bg/60 p-4 text-center">
+        <p className="text-sm text-ink">Kartu anggota gagal dimuat.</p>
+        <p className="mt-1 text-[12px] text-muted">
+          QR Code tidak dapat diambil. Periksa koneksi lalu coba lagi.
+        </p>
+        <Button size="sm" variant="secondary" className="mt-3" onClick={() => setAttempt((n) => n + 1)}>
+          Coba lagi
+        </Button>
+      </div>
+    )
+  }
+
+  const gridClass = layout === 'grid' ? 'grid gap-4 lg:grid-cols-2' : 'grid gap-4'
 
   return (
     <div className="space-y-3">
-      <div ref={cardRef} className="mx-auto w-full max-w-xs rounded-2xl border border-line bg-surface p-5 text-center shadow-sm">
-        <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary">
-          {photoUrl ? (
-            <img src={photoUrl} alt={name} className="h-full w-full object-cover" />
-          ) : (
-            <Icon name="user" size={28} />
-          )}
-        </div>
-        <p className="text-base font-bold text-ink">{name}</p>
-        <p className="text-[12px] text-muted">{memberNumber ?? userId}</p>
-        {qrUrl && <img src={qrUrl} alt="QR Code ID Card" className="mx-auto mt-3 h-44 w-44" />}
-        <p className="mt-2 text-[11px] font-semibold tracking-wide text-muted">WISANGGENI CLIMBING CLUB</p>
+      <div className={gridClass}>
+        <figure className="min-w-0">
+          <figcaption className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+            Sisi Depan
+          </figcaption>
+          <canvas
+            ref={frontRef}
+            width={CARD_WIDTH}
+            height={CARD_HEIGHT}
+            role="img"
+            aria-label={`Kartu anggota WCC sisi depan, ${name}, ${ROLE_LABEL[role]}`}
+            className="block h-auto w-full rounded-[10px] shadow-soft ring-1 ring-black/10"
+          />
+        </figure>
+
+        <figure className="min-w-0">
+          <figcaption className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+            Sisi Belakang
+          </figcaption>
+          <canvas
+            ref={backRef}
+            width={CARD_WIDTH}
+            height={CARD_HEIGHT}
+            role="img"
+            aria-label="Kartu anggota WCC sisi belakang berisi informasi organisasi"
+            className="block h-auto w-full rounded-[10px] shadow-soft ring-1 ring-black/10"
+          />
+        </figure>
       </div>
+
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" icon="download" onClick={download} disabled={!qrUrl}>
-          Unduh QR
+        <Button
+          size="sm"
+          icon="download"
+          onClick={() => void handlePng('front')}
+          loading={downloading === 'front'}
+          disabled={downloading !== null}
+        >
+          Unduh PNG Depan
         </Button>
-        <Button size="sm" variant="secondary" icon="download" onClick={printCard} disabled={!qrUrl}>
-          Cetak ID Card
+        <Button
+          size="sm"
+          variant="secondary"
+          icon="download"
+          onClick={() => void handlePng('back')}
+          loading={downloading === 'back'}
+          disabled={downloading !== null}
+        >
+          Unduh PNG Belakang
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          icon="file-text"
+          onClick={handlePdf}
+          loading={downloading === 'pdf'}
+          disabled={downloading !== null}
+        >
+          Unduh PDF (2 sisi)
         </Button>
       </div>
-      <p className="text-[11px] text-muted">QR Code bersifat permanen dan tidak dapat dibuat ulang.</p>
-      {token && <p className="text-[11px] text-muted">Token: {token.slice(0, 8)}…</p>}
+
+      <p className="text-[11px] text-muted">
+        QR Code memakai token absensi yang sudah ada dan bersifat permanen; tidak dibuat ulang.
+      </p>
     </div>
   )
 }

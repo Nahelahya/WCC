@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Font asli template Canva "Gold and Black Modern VIP Member Card".
+   Dibundel lokal agar tampilan kartu dan hasil ekspor PNG/PDF konsisten. */
+@font-face {
+  font-family: 'Cinzel Decorative';
+  src: url('/fonts/cinzel-decorative-regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Anton';
+  src: url('/fonts/anton-regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nourd';
+  src: url('/fonts/nourd-regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 @layer base {
   :root {
     /* Nilai disimpan sebagai channel RGB tanpa koma agar modifier opasitas

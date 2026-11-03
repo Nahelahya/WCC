@@ -563,7 +563,7 @@ export function UsersPage() {
             {(detail.role === 'anggota' || detail.role === 'coach' || detail.role === 'pengurus') && (
               <div className="rounded-control border border-line p-3">
                 <p className="mb-2 text-[12px] font-semibold text-muted">ID Card &amp; QR Code Absensi</p>
-                <MemberIdCard userId={detail.id} name={detail.name} photoUrl={detail.photoUrl} memberNumber={detail.id} />
+                <MemberIdCard userId={detail.id} name={detail.name} role={detail.role} layout="stacked" />
               </div>
             )}
 
