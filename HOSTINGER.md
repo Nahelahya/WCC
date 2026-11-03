@@ -88,8 +88,11 @@ Letakkan **di luar** `hbuilds/` agar tidak hilang setiap deploy:
 
 Jika `SMTP_HOST` kosong, email hanya ditulis ke log server (tidak terkirim).
 
-> **JANGAN set `PORT`.** Hostinger/Passenger menyediakan port otomatis lewat
-> `process.env.PORT`; app sudah membacanya.
+> **JANGAN set `PORT`.** Di Hostinger, proses Node dijalankan oleh LiteSpeed
+> (`lsnode`) dan `app.listen()` otomatis diarahkan ke socket milik LiteSpeed
+> (`LSNODE_SOCKET`, mis. `/usr/local/lsws/extapp-sock/<domain>:_.sock`).
+> Angka `4000` yang muncul di log hanyalah nilai cadangan untuk lokal; tidak
+> dipakai di Hostinger. Menyetel `PORT` justru bisa mengacaukan setelan platform.
 
 > **Catatan `DATABASE_URL`:** bila password memuat karakter khusus (mis. `#`,
 > `/`, `?`), app akan meng-encode bagian password secara otomatis (lihat
@@ -167,7 +170,8 @@ Akun demo (`anggota@wcc.id`, `coach@wcc.id`, `pengurus@wcc.id`) sudah
 
 | Masalah | Solusi |
 |---|---|
-| Semua rute → **503 Service Unavailable** | Aplikasi crash saat start. Baca `hbuilds/current/nodejs/stderr.log` / `console.log`. |
+| Semua rute → **503 Service Unavailable** (“The server is temporarily busy”) | Proses Node sedang tidak berjalan. Cek **Runtime Logs**; kalau tidak ada log baru, klik **Restart** di dashboard Web App. Aplikasi Hostinger berjalan *on-demand* (dihentikan saat idle) dan biasanya menyala lagi sendiri saat ada permintaan — kalau tidak, restart manual / redeploy memulihkannya. |
+| Log menampilkan `Listen : /usr/local/lsws/extapp-sock/...sock` | Normal. Itu socket LiteSpeed; `PORT`/`localhost:4000` tidak dipakai di Hostinger. |
 | `ERR_REQUIRE_ASYNC_MODULE` | Entry harus CommonJS (`server.cjs`), bukan ESM dengan top-level `await`. |
 | `/api/*` → 404 HTML, `/` menampilkan statis lama | Application type masih **vite/static**. Set ke **Express**, Output directory **kosong**. |
 | `TypeError: Invalid URL` (pg) | Password `DATABASE_URL` memuat karakter khusus — pastikan `connectionString.ts` dipakai (sudah otomatis). |

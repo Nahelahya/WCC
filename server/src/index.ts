@@ -15,14 +15,8 @@ const server = app.listen(env.port, () => {
   const address = server.address()
   const listenInfo =
     typeof address === 'string' ? address : address ? `${address.address}:${address.port}` : 'tidak diketahui'
-  const runtimeKeys = Object.keys(process.env).filter((key) =>
-    /^(PORT|PASSENGER_|LSAPI_|LSNODE_|NODE_OPTIONS|APP_ROOT|SOCKET|HOST)/.test(key),
-  )
   console.log(`  WCC API siap di http://localhost:${env.port}`)
   console.log(`  Listen      : ${listenInfo}`)
-  console.log(
-    `  Env runtime : ${runtimeKeys.length ? runtimeKeys.map((key) => `${key}=${process.env[key]}`).join(' | ') : '(tidak ada)'}`,
-  )
   console.log(`  Environment : ${env.nodeEnv}`)
   console.log(`  Database    : ${maskedDb}`)
   console.log(`  CORS origin : ${env.corsOrigins.join(', ')}`)
