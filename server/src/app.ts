@@ -21,6 +21,7 @@ import { transactionRouter } from './routes/transactions'
 import { uploadRouter } from './routes/uploads'
 import { landingRouter } from './routes/landing'
 import { paymentRouter } from './routes/payments'
+import { pushRouter } from './routes/push'
 import { userRouter } from './routes/users'
 import { uploadDir } from './lib/uploads'
 
@@ -111,6 +112,7 @@ export function createApp() {
   app.use('/api/coaches', coachRouter)
   app.use('/api/registrations', registrationRouter)
   app.use('/api/payments', paymentRouter)
+app.use('/api/push', pushRouter)
   app.use('/api/transactions', transactionRouter)
   app.use('/api/audit-logs', auditRouter)
   app.use('/api/uploads', uploadRouter)
