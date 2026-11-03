@@ -24,6 +24,13 @@ export const env = {
   // ---- URL aplikasi publik (dipakai pada tautan email, mis. reset password) ----
   publicAppUrl: (process.env.PUBLIC_APP_URL ?? 'http://localhost:5173').replace(/\/+$/, ''),
 
+  // ---- Web Push (VAPID) ----
+  // Kosong = push nonaktif; endpoint subscribe mengembalikan 503.
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? '',
+  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? '',
+  vapidSubject: process.env.VAPID_SUBJECT ?? (process.env.PUBLIC_APP_URL?.startsWith('https://')
+    ? process.env.PUBLIC_APP_URL : 'mailto:no-reply@wcc.id'),
+
   // ---- Email (SMTP). Bila SMTP_HOST kosong, email ditulis ke log server. ----
   smtpHost: process.env.SMTP_HOST ?? '',
   smtpPort: Number(process.env.SMTP_PORT ?? 587),
