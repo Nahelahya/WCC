@@ -122,7 +122,9 @@ export function createApp() {
   // permintaan domain diarahkan ke proses Node.js (mis. Hostinger Node.js),
   // sehingga rute SPA seperti /masuk tidak dibalas 404.
   const frontendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist')
-  if (existsSync(path.join(frontendDir, 'index.html'))) {
+  const hasFrontend = existsSync(path.join(frontendDir, 'index.html'))
+  console.log(`  Frontend    : ${frontendDir} (${hasFrontend ? 'ada' : 'TIDAK ADA'})`)
+  if (hasFrontend) {
     app.use(express.static(frontendDir, { index: false }))
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next()
