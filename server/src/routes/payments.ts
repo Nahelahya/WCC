@@ -34,6 +34,7 @@ import { newId } from '../lib/ids'
 import { requireAuth, requireRole } from '../middleware/auth'
 import { writeAudit } from '../lib/audit'
 import { createDokuCheckout, dokuConfigured, verifyDokuNotification } from '../lib/doku'
+import { sendPushToUser } from '../lib/push'
 import { mapPayment, type PaymentRow } from '../lib/mappers'
 import { todayISO } from '../lib/time'
 import { env } from '../env'
@@ -624,7 +625,15 @@ paymentRouter.post(
 
     const status = String(payload.transaction?.status ?? '').toUpperCase()
     if (status === 'SUCCESS') {
-      await applyPaid(payment.id, payload)
+      const applied = await applyPaid(payment.id, payload)
+      if (applied?.user_id) {
+        void sendPushToUser(applied.user_id, {
+          title: 'Pembayaran Diterima',
+          body: `Pembayaran ${applied.purpose} sebesar Rp ${Number(applied.amount).toLocaleString('id-ID')} lunas`,
+          url: '/app/iuran',
+          icon: '/logo-wcc.png',
+        })
+      }
     } else if (status === 'FAILED' || status === 'EXPIRED') {
       await query(
         `update payments set status = $2, notification = $3, updated_at = now()
