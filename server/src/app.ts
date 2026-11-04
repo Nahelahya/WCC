@@ -112,7 +112,7 @@ export function createApp() {
   app.use('/api/coaches', coachRouter)
   app.use('/api/registrations', registrationRouter)
   app.use('/api/payments', paymentRouter)
-app.use('/api/push', pushRouter)
+  app.use('/api/push', pushRouter)
   app.use('/api/transactions', transactionRouter)
   app.use('/api/audit-logs', auditRouter)
   app.use('/api/uploads', uploadRouter)
