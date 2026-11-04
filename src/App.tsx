@@ -27,10 +27,12 @@ import { PaymentsPage } from '@/pages/app/admin/PaymentsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 import { OfflineBanner } from '@/components/ui/OfflineBanner'
+import { PushPermissionPrompt } from '@/components/ui/PushPermissionPrompt'
 
 export function App() {
   return (
     <>
+      <PushPermissionPrompt />
       <OfflineBanner />
       <Routes>
       {/* Halaman publik */}

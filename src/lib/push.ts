@@ -10,6 +10,9 @@ import { API_MODE } from '@/api/client'
 
 const BASE = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/+$/, '')
 
+/** Dipancarkan setelah prompt izin notifikasi dijawab (granted/denied). */
+export const PUSH_PERMISSION_EVENT = 'wcc:push-permission'
+
 export function isPushSupported(): boolean {
   if (API_MODE !== 'live') return false
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false
