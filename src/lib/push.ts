@@ -130,32 +130,6 @@ export async function subscribePush(): Promise<{ ok: boolean; reason?: string }>
   }
 }
 
-export async function unsubscribePush(): Promise<void> {
-  if (API_MODE !== 'live' || !isPushSupported()) return
-
-  try {
-    const registration = await navigator.serviceWorker.getRegistration()
-    if (!registration) return
-    const subscription = await registration.pushManager.getSubscription()
-
-    const endpoint = subscription?.endpoint
-    if (subscription) {
-      await subscription.unsubscribe()
-    }
-
-    if (endpoint) {
-      await fetch(`${BASE}/push/unsubscribe`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endpoint }),
-      }).catch(() => undefined)
-    }
-  } catch {
-    /* no-op */
-  }
-}
-
 export async function isPushSubscribed(): Promise<boolean> {
   if (API_MODE !== 'live' || !isPushSupported()) return false
   try {
