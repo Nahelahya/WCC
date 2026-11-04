@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API_MODE, attendanceApi, syncApi, uploadApi, userApi } from '@/api/client'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useAsync, errorMessage } from '@/lib/hooks'
+import { getPushPermission, isPushSubscribed, isPushSupported, subscribePush, unsubscribePush } from '@/lib/push'
 import { PageHeader, SectionHeader } from '@/components/layout/PageHeader'
 import { StatCard } from '@/components/cards/StatCard'
 import { Button, buttonClasses } from '@/components/ui/Button'
@@ -50,6 +51,23 @@ export function ProfilePage() {
   const [resetting, setResetting] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [removingPhoto, setRemovingPhoto] = useState(false)
+
+  const [pushSupported] = useState(() => isPushSupported())
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>(() => getPushPermission())
+  const [pushSubscribed, setPushSubscribed] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushError, setPushError] = useState('')
+
+  useEffect(() => {
+    if (!pushSupported) return
+    let cancelled = false
+    void isPushSubscribed().then((value) => {
+      if (!cancelled) setPushSubscribed(value)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [pushSupported])
 
   const rows = history.data ?? []
   const hadir = rows.filter((r) => r.status === 'hadir').length
@@ -159,6 +177,30 @@ export function ProfilePage() {
       toast(errorMessage(err), 'error')
     } finally {
       setRemovingPhoto(false)
+    }
+  }
+
+  async function togglePush() {
+    if (pushBusy) return
+    setPushBusy(true)
+    setPushError('')
+    try {
+      if (pushSubscribed) {
+        await unsubscribePush()
+        setPushSubscribed(false)
+        toast('Notifikasi push dinonaktifkan di perangkat ini.', 'info')
+      } else {
+        const result = await subscribePush()
+        if (!result.ok) {
+          setPushError(result.reason ?? 'Gagal mengaktifkan notifikasi.')
+          return
+        }
+        setPushSubscribed(true)
+        toast('Notifikasi push aktif di perangkat ini.', 'success')
+      }
+    } finally {
+      setPushPermission(getPushPermission())
+      setPushBusy(false)
     }
   }
 
@@ -374,6 +416,41 @@ export function ProfilePage() {
 
         {/* Riwayat & pengaturan */}
         <section>
+          {pushSupported && (
+            <>
+              <SectionHeader
+                title="Notifikasi Push"
+                description="Dapatkan pemberitahuan pengumuman, sesi baru, dan pembayaran di perangkat ini."
+              />
+              <div className="card mb-6 space-y-3 p-4 sm:p-5">
+                <p className="text-sm text-muted">
+                  {pushSubscribed
+                    ? 'Notifikasi push aktif di perangkat ini.'
+                    : 'Aktifkan untuk menerima notifikasi walau aplikasi sedang ditutup.'}
+                </p>
+                {pushPermission === 'denied' && (
+                  <Alert tone="warning" title="Izin notifikasi diblokir">
+                    Izinkan notifikasi untuk situs ini di pengaturan peramban, lalu muat ulang halaman.
+                  </Alert>
+                )}
+                {pushError && (
+                  <Alert tone="error" title="Gagal mengaktifkan notifikasi">
+                    {pushError}
+                  </Alert>
+                )}
+                <Button
+                  variant={pushSubscribed ? 'secondary' : 'primary'}
+                  icon={pushSubscribed ? 'x' : 'megaphone'}
+                  loading={pushBusy}
+                  disabled={pushPermission === 'denied' && !pushSubscribed}
+                  onClick={() => void togglePush()}
+                >
+                  {pushSubscribed ? 'Nonaktifkan Notifikasi' : 'Aktifkan Notifikasi'}
+                </Button>
+              </div>
+            </>
+          )}
+
           <SectionHeader title="Riwayat absensi" description="Klik sesi untuk melihat detail." />
           {history.loading ? (
             <div className="card">
