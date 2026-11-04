@@ -1,4 +1,4 @@
-const CACHE = 'wcc-v4'
+const CACHE = 'wcc-v5'
 const ASSETS = ['/manifest.json']
 
 // Halaman cadangan saat perangkat benar-benar offline dan tidak ada halaman
@@ -71,6 +71,45 @@ self.addEventListener('fetch', (event) => {
           return res
         })
         .catch(() => Response.error())
+    }),
+  )
+})
+
+/* ------------------------------ Web Push ------------------------------ */
+
+/**
+ * Tampilkan notifikasi dari payload push. Payload diharapkan JSON
+ * `{ title, body, url, icon }`; bila gagal di-parse, pakai teks default.
+ */
+self.addEventListener('push', (event) => {
+  let data = {}
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch {
+    data = { body: event.data ? event.data.text() : '' }
+  }
+
+  const title = data.title || 'WCC'
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || '',
+      icon: data.icon || '/logo-wcc.png',
+      badge: data.icon || '/logo-wcc.png',
+      data: { url: data.url || '/' },
+    }),
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const target = new URL(event.notification.data?.url || '/', self.location.origin).href
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url === target && 'focus' in client) return client.focus()
+      }
+      return self.clients.openWindow(target)
     }),
   )
 })
