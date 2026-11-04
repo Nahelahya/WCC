@@ -51,25 +51,23 @@ export function PushPermissionPrompt() {
       }
     }
 
+    const finish = () => {
+      if (cancelled) return
+      const permission = getPushPermission()
+      if (permission === 'granted') {
+        markPrompted()
+        stopFallback()
+        window.dispatchEvent(new Event(PUSH_PERMISSION_EVENT))
+      } else if (permission === 'denied' || promptedByGesture) {
+        markPrompted()
+        stopFallback()
+      } else {
+        armFallback()
+      }
+    }
+
     const ask = () => {
-      void Notification.requestPermission()
-        .then(() => {
-          if (cancelled) return
-          const permission = getPushPermission()
-          if (permission === 'granted') {
-            markPrompted()
-            stopFallback()
-            window.dispatchEvent(new Event(PUSH_PERMISSION_EVENT))
-          } else if (permission === 'denied' || promptedByGesture) {
-            markPrompted()
-            stopFallback()
-          } else {
-            armFallback()
-          }
-        })
-        .catch(() => {
-          if (!cancelled && promptedByGesture) markPrompted()
-        })
+      void Notification.requestPermission().then(finish).catch(finish)
     }
 
     ask()
