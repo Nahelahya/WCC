@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useIdleLogout, IDLE_LOGOUT_FLAG } from '@/lib/hooks'
+import { getPushPermission, isPushSupported, PUSH_PERMISSION_EVENT, subscribePush } from '@/lib/push'
 import { PageLoading, EmptyState } from '@/components/ui/Feedback'
 import { Button, buttonClasses } from '@/components/ui/Button'
 import { Logo } from '@/components/ui/Logo'
@@ -26,6 +27,19 @@ export function AppShell({ children }: { children?: ReactNode }) {
     }
     void logout()
   })
+
+  // Simpan subscription push setiap kali user login dan izin sudah diberikan.
+  useEffect(() => {
+    if (!user?.id) return
+    const sync = () => {
+      if (isPushSupported() && getPushPermission() === 'granted') {
+        void subscribePush()
+      }
+    }
+    sync()
+    window.addEventListener(PUSH_PERMISSION_EVENT, sync)
+    return () => window.removeEventListener(PUSH_PERMISSION_EVENT, sync)
+  }, [user?.id])
 
   if (loading) {
     return (
